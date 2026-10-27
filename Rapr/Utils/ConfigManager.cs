@@ -17,12 +17,26 @@ namespace Rapr.Utils
 
         public static List<DriverStoreEntry> FillDeviceInfo(List<DriverStoreEntry> driverStoreEntries, List<DeviceDriverInfo> devicesInfo)
         {
+            // Index the devices once instead of sorting the whole list again for every driver.
+            // Present devices come first, and the first device in that order wins, as before.
+            var devicesByInf = new Dictionary<string, DeviceDriverInfo>(StringComparer.OrdinalIgnoreCase);
+            foreach (var device in devicesInfo.OrderByDescending(d => d.IsPresent))
+            {
+                AddDeviceForInf(devicesByInf, device.DriverInf, device);
+
+                foreach (var extendedInf in device.ExtendedInfs ?? Array.Empty<string>())
+                {
+                    AddDeviceForInf(devicesByInf, extendedInf, device);
+                }
+            }
+
             foreach (var driverStoreEntry in driverStoreEntries)
             {
-                var deviceInfo = devicesInfo.OrderByDescending(d => d.IsPresent)?.FirstOrDefault(e =>
-                    (!string.IsNullOrEmpty(driverStoreEntry.DriverPublishedName)
-                        && string.Equals(e.DriverInf, driverStoreEntry.DriverPublishedName, StringComparison.OrdinalIgnoreCase))
-                    || e.ExtendedInfs?.Any(extInf => string.Equals(extInf, driverStoreEntry.DriverPublishedName, StringComparison.OrdinalIgnoreCase)) == true);
+                DeviceDriverInfo deviceInfo = null;
+                if (!string.IsNullOrEmpty(driverStoreEntry.DriverPublishedName))
+                {
+                    devicesByInf.TryGetValue(driverStoreEntry.DriverPublishedName, out deviceInfo);
+                }
 
                 driverStoreEntry.DeviceId = deviceInfo?.DeviceId;
                 driverStoreEntry.DeviceName = deviceInfo?.DeviceName;
@@ -30,6 +44,14 @@ namespace Rapr.Utils
             }
 
             return driverStoreEntries;
+        }
+
+        private static void AddDeviceForInf(Dictionary<string, DeviceDriverInfo> devicesByInf, string inf, DeviceDriverInfo device)
+        {
+            if (!string.IsNullOrEmpty(inf) && !devicesByInf.ContainsKey(inf))
+            {
+                devicesByInf.Add(inf, device);
+            }
         }
 
         public static List<DeviceDriverInfo> GetDeviceDriverInfo()

@@ -110,6 +110,40 @@ namespace Rapr.Tests.Utils
         }
 
         [TestMethod]
+        public void FillDeviceInfoPrefersPresentDevicesThenListOrder()
+        {
+            var devices = new List<DeviceDriverInfo>
+            {
+                Device("oem1-missing", "oem1.inf", false),
+                Device("oem1-present", "OEM1.INF", true),
+                Device("oem2-unknown", "oem2.inf", null),
+                Device("oem2-extension", "oem5.inf", false, "oem2.inf"),
+                Device("oem3-first", "oem3.inf", true),
+                Device("oem3-second", "oem3.inf", true),
+                Device("no-inf", null, true),
+            };
+            var entries = new List<DriverStoreEntry>
+            {
+                new DriverStoreEntry { DriverPublishedName = "oem1.inf" },
+                new DriverStoreEntry { DriverPublishedName = "oem2.inf" },
+                new DriverStoreEntry { DriverPublishedName = "oem3.inf" },
+                new DriverStoreEntry { DriverPublishedName = "oem9.inf" },
+                new DriverStoreEntry { DriverPublishedName = null },
+            };
+
+            ConfigManager.FillDeviceInfo(entries, devices);
+
+            CollectionAssert.AreEqual(
+                new[] { "oem1-present", "oem2-extension", "oem3-first", null, null },
+                entries.ConvertAll(e => e.DeviceId));
+        }
+
+        private static DeviceDriverInfo Device(string id, string inf, bool? present, params string[] extendedInfs)
+        {
+            return new DeviceDriverInfo(id, id, inf, default(DateTime), null, present, extendedInfs.Length > 0 ? extendedInfs : null);
+        }
+
+        [TestMethod]
         public void DeviceListRetriesWithUpdatedSize()
         {
             int sizeQueries = 0;
