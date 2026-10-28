@@ -25,4 +25,6 @@ Publish a folder to copy elsewhere (needs the .NET 10 Runtime; the Windows App S
 dotnet publish RaprWinUI -c Release -r win-x64 -p:Platform=x64 --self-contained false -o publish-winui
 ```
 
-Settings and the log are kept in `%LOCALAPPDATA%\DriverStoreExplorer`.
+The app is portable: the settings (`WinUI.settings.json`) and the log (`DriverStoreExplorer.WinUI.log`)
+are kept in the folder of the exe. Only if that folder can't be written to they go to
+`%LOCALAPPDATA%\DriverStoreExplorer`.
