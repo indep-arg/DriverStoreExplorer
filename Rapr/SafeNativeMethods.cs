@@ -1,37 +1,30 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using System.Security;
-using System.Text;
 
 using Microsoft.Win32.SafeHandles;
 
 namespace Rapr
 {
     /// <summary>
-    /// This class suppresses stack walks for unmanaged code permission. 
-    /// (System.Security.SuppressUnmanagedCodeSecurityAttribute is applied to this class.) 
-    /// This class is for methods that are safe for anyone to call. 
-    /// Callers of these methods are not required to perform a full security review to make sure that the 
-    /// usage is secure because the methods are harmless for any caller.
+    /// Small Win32 calls used by the UI. The marshalling code is generated at build time.
     /// </summary>
-    [SuppressUnmanagedCodeSecurity]
-    public static class SafeNativeMethods
+    internal static partial class SafeNativeMethods
     {
-        [DllImport("shell32.dll", EntryPoint = "ExtractAssociatedIcon", CharSet = CharSet.Unicode)]
-        internal static extern IntPtr ExtractAssociatedIcon(HandleRef hInst, StringBuilder iconPath, ref int index);
+        [LibraryImport("shell32.dll", EntryPoint = "ExtractAssociatedIconW", StringMarshalling = StringMarshalling.Utf16)]
+        internal static partial IntPtr ExtractAssociatedIcon(IntPtr hInst, [In, Out] char[] iconPath, ref ushort index);
 
-        [DllImport("user32.dll", SetLastError = true)]
+        [LibraryImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        internal static extern bool DestroyIcon(IntPtr hIcon);
+        internal static partial bool DestroyIcon(IntPtr hIcon);
 
-        [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
-        internal static extern int SetWindowTheme(IntPtr hWnd, string? pszSubAppName, string? pszSubIdList);
+        [LibraryImport("uxtheme.dll", StringMarshalling = StringMarshalling.Utf16)]
+        internal static partial int SetWindowTheme(IntPtr hWnd, string? pszSubAppName, string? pszSubIdList);
 
-        [DllImport("user32.dll")]
-        internal static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+        [LibraryImport("user32.dll", EntryPoint = "SendMessageW")]
+        internal static partial IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
-        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        public static extern SafeFileHandle CreateFile(
+        [LibraryImport("kernel32.dll", EntryPoint = "CreateFileW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+        internal static partial SafeFileHandle CreateFile(
             string lpFileName,
             int dwDesiredAccess,
             int dwShareMode,
@@ -40,10 +33,10 @@ namespace Rapr
             int dwFlagsAndAttributes,
             IntPtr hTemplateFile);
 
-        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        public static extern int GetFinalPathNameByHandle(
+        [LibraryImport("kernel32.dll", EntryPoint = "GetFinalPathNameByHandleW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+        internal static partial int GetFinalPathNameByHandle(
             SafeFileHandle hFile,
-            StringBuilder lpszFilePath,
+            [Out] char[] lpszFilePath,
             int cchFilePath,
             int dwFlags);
     }

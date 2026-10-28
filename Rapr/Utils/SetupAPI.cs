@@ -11,7 +11,7 @@ using FILETIME = System.Runtime.InteropServices.ComTypes.FILETIME;
 
 namespace Rapr.Utils
 {
-    public static class SetupAPI
+    public static partial class SetupAPI
     {
         public static List<DeviceDriverInfo> GetDeviceDriverInfo()
         {
@@ -104,7 +104,7 @@ namespace Rapr.Utils
             }
             else
             {
-                StringBuilder destInfFullPath = new StringBuilder(MAX_PATH);
+                char[] destInfFullPath = new char[MAX_PATH];
                 uint requiredSize = 0;
 
                 result = NativeMethods.SetupCopyOEMInf(
@@ -113,7 +113,7 @@ namespace Rapr.Utils
                     OemSourceMediaType.SPOST_PATH,
                     OemCopyStyle.NONE,
                     destInfFullPath,
-                    (uint)destInfFullPath.Capacity,
+                    (uint)destInfFullPath.Length,
                     ref requiredSize,
                     IntPtr.Zero);
             }
@@ -151,17 +151,25 @@ namespace Rapr.Utils
             }
         }
 
+        /// <summary>
+        /// Whether a Windows DLL exports a function. Only System32 is searched, so a DLL with the
+        /// same name next to the app or on the PATH is never loaded.
+        /// </summary>
         public static bool MethodExists(string libraryName, string methodName)
         {
-            var libraryPtr = NativeMethods.LoadLibrary(libraryName);
-
-            if (libraryPtr != UIntPtr.Zero)
+            if (!NativeLibrary.TryLoad(libraryName, typeof(SetupAPI).Assembly, DllImportSearchPath.System32, out IntPtr library))
             {
-                var procPtr = NativeMethods.GetProcAddress(libraryPtr, methodName);
-                return procPtr != UIntPtr.Zero;
+                return false;
             }
 
-            return false;
+            try
+            {
+                return NativeLibrary.TryGetExport(library, methodName, out _);
+            }
+            finally
+            {
+                NativeLibrary.Free(library);
+            }
         }
 
         private static string? GetDriverInf(IntPtr deviceInfoSet, SP_DEVINFO_DATA deviceInfo)
@@ -589,40 +597,39 @@ namespace Rapr.Utils
         /// <summary>
         /// The managed interop layer to setupapi.dll
         /// </summary>
-        internal static class NativeMethods
+        /// <summary>
+        /// The managed interop layer to setupapi.dll and newdev.dll. Calls that take a structure with
+        /// fixed-size strings (SP_DRVINFO_DATA and friends) stay DllImport, since the generated
+        /// marshalling doesn't handle those.
+        /// </summary>
+        internal static partial class NativeMethods
         {
-            [DllImport("Kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-            internal static extern UIntPtr LoadLibrary(string lpFileName);
+            [LibraryImport("newdev.dll", EntryPoint = "DiInstallDriverW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            internal static partial bool DiInstallDriver(
+                IntPtr hwndParent,
+                string infPath,
+                uint flags,
+                [MarshalAs(UnmanagedType.Bool)] out bool needReboot);
 
-            [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA2101:Specify marshaling for P/Invoke string arguments", Justification = "GetProcAddress only comes in an ANSI flavor.")]
-            [DllImport("Kernel32.dll", SetLastError = true, CharSet = CharSet.Ansi, ExactSpelling = true)]
-            internal static extern UIntPtr GetProcAddress(UIntPtr hModule, string lpProcName);
+            [LibraryImport("newdev.dll", EntryPoint = "DiUninstallDriverW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            internal static partial bool DiUninstallDriver(
+                IntPtr hwndParent,
+                string infPath,
+                DIURFLAG flags,
+                [MarshalAs(UnmanagedType.Bool)] out bool needReboot);
 
-            [DllImport("newdev.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-            internal static extern bool DiInstallDriver(
-                [In] IntPtr hwndParent,
-                [In] string infPath,
-                [In] uint flags,
-                [Out] out bool needReboot
-            );
-
-            [DllImport("newdev.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-            internal static extern bool DiUninstallDriver(
-                [In] IntPtr hwndParent,
-                [In] string infPath,
-                [In] DIURFLAG flags,
-                [Out] out bool needReboot
-            );
-
-            [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-            internal static extern IntPtr SetupDiGetClassDevs(
+            [LibraryImport("setupapi.dll", EntryPoint = "SetupDiGetClassDevsW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+            internal static partial IntPtr SetupDiGetClassDevs(
                IntPtr classGuid,
                string? enumerator,
                IntPtr hwndParent,
                DIGCF flags);
 
-            [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-            internal static extern bool SetupDiEnumDeviceInfo(
+            [LibraryImport("setupapi.dll", SetLastError = true)]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            internal static partial bool SetupDiEnumDeviceInfo(
                 IntPtr deviceInfoSet,
                 int memberIndex,
                 ref SP_DEVINFO_DATA deviceInfoData);
@@ -669,8 +676,9 @@ namespace Rapr.Utils
                int driverInfoDetailDataSize,
                out int requiredSize);
 
-            [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-            internal static extern bool SetupDiGetDeviceRegistryProperty(
+            [LibraryImport("setupapi.dll", EntryPoint = "SetupDiGetDeviceRegistryPropertyW", SetLastError = true)]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            internal static partial bool SetupDiGetDeviceRegistryProperty(
                 IntPtr deviceInfoSet,
                 ref SP_DEVINFO_DATA deviceInfoData,
                 DeviceRegistryProperty property,
@@ -679,8 +687,9 @@ namespace Rapr.Utils
                 uint propertyBufferSize,
                 out uint requiredSize);
 
-            [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-            internal static extern bool SetupDiGetDeviceProperty(
+            [LibraryImport("setupapi.dll", EntryPoint = "SetupDiGetDevicePropertyW", SetLastError = true)]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            internal static partial bool SetupDiGetDeviceProperty(
                 IntPtr deviceInfoSet,
                 ref SP_DEVINFO_DATA deviceInfoData,
                 ref DevPropKey propertyKey,
@@ -690,20 +699,23 @@ namespace Rapr.Utils
                 out uint requiredSize,
                 uint flags);
 
-            [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-            internal static extern bool SetupDiBuildDriverInfoList(
+            [LibraryImport("setupapi.dll", SetLastError = true)]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            internal static partial bool SetupDiBuildDriverInfoList(
                 IntPtr deviceInfoSet,
                 ref SP_DEVINFO_DATA deviceInfoData,
                 SPDIT driverType);
 
-            [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-            internal static extern bool SetupDiDestroyDriverInfoList(
+            [LibraryImport("setupapi.dll", SetLastError = true)]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            internal static partial bool SetupDiDestroyDriverInfoList(
                 IntPtr deviceInfoSet,
                 ref SP_DEVINFO_DATA deviceInfoData,
                 SPDIT driverType);
 
-            [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-            internal static extern bool SetupDiDestroyDeviceInfoList(IntPtr deviceInfoSet);
+            [LibraryImport("setupapi.dll", SetLastError = true)]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            internal static partial bool SetupDiDestroyDeviceInfoList(IntPtr deviceInfoSet);
 
             [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
             internal static extern bool SetupVerifyInfFile(
@@ -711,22 +723,22 @@ namespace Rapr.Utils
                 IntPtr altPlatformInfo,
                 ref SP_INF_SIGNER_INFO infSignerInfo);
 
-            [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+            [LibraryImport("setupapi.dll", EntryPoint = "SetupCopyOEMInfW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
             [return: MarshalAs(UnmanagedType.Bool)]
-            internal static extern bool SetupCopyOEMInf(
-                [MarshalAs(UnmanagedType.LPWStr)] string infName,
-                [MarshalAs(UnmanagedType.LPWStr)] string? sourceMediaLocation,
+            internal static partial bool SetupCopyOEMInf(
+                string infName,
+                string? sourceMediaLocation,
                 OemSourceMediaType sourceMediaType,
                 OemCopyStyle copyStyle,
-                [In, Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder destInfFullPath,
+                [Out] char[] destInfFullPath,
                 uint destInfFullPathSize,
                 ref uint desInfFullPathReqSize,
                 IntPtr destInfFilename);
 
-            [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+            [LibraryImport("setupapi.dll", EntryPoint = "SetupUninstallOEMInfW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
             [return: MarshalAs(UnmanagedType.Bool)]
-            internal static extern bool SetupUninstallOEMInf(
-                [MarshalAs(UnmanagedType.LPWStr)] string infName,
+            internal static partial bool SetupUninstallOEMInf(
+                string infName,
                 SetupUOInfFlags flags,
                 IntPtr reserved);
         }
