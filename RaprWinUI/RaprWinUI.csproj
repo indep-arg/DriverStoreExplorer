@@ -34,8 +34,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" />
+    <!--
+      Only the WinUI component of the Windows App SDK, not the Microsoft.WindowsAppSDK metapackage:
+      that one also brings the AI, ML (onnxruntime, DirectML), Search, Widgets and WebView2 parts,
+      about 60 MB this app never uses.
+    -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.6.4" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
     <PackageReference Include="Microsoft.Dism" Version="6.1.0" />
   </ItemGroup>
 
@@ -69,6 +74,28 @@
     <ItemGroup>
       <_XamlOutput Include="$(OutDir)*.xbf;$(OutDir)$(AssemblyName).pri" />
       <ResolvedFileToPublish Include="@(_XamlOutput->'%(FullPath)')" RelativePath="%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    WinUI ships its own strings for 76 Windows languages as *.mui files, two per language folder.
+    The app is translated to the languages of Rapr\Lang only, so keep the ones for those (and
+    English) and leave the rest out of the publish folder: other languages fall back to English.
+  -->
+  <Target Name="TrimUnusedWinUILanguages" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <_LangResx Include="..\Rapr\Lang\Language.*.resx" />
+      <_AppCulture Include="$([System.String]::Copy('%(_LangResx.Filename)').Substring(9).ToLowerInvariant())" />
+      <_AppCulture Include="en-us" />
+      <_MuiFile Include="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.mui'" />
+    </ItemGroup>
+    <PropertyGroup>
+      <_AppCultures>;@(_AppCulture);</_AppCultures>
+    </PropertyGroup>
+    <ItemGroup>
+      <_MuiFile Update="@(_MuiFile)" Culture="$([System.String]::Copy('%(RelativePath)').Split('\')[0].ToLowerInvariant())" />
+      <_MuiUnused Include="@(_MuiFile)" Condition="!$(_AppCultures.Contains(';%(Culture);'))" />
+      <ResolvedFileToPublish Remove="@(_MuiUnused)" />
     </ItemGroup>
   </Target>
 

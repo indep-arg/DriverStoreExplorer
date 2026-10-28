@@ -25,6 +25,11 @@ Publish a folder to copy elsewhere (needs the .NET 10 Runtime; the Windows App S
 dotnet publish RaprWinUI -c Release -r win-x64 -p:Platform=x64 --self-contained false -o publish-winui
 ```
 
+The folder is about 90 MB: the app itself is under 3 MB, the rest is the Windows App SDK that makes it
+run without installing anything. Only its WinUI part is referenced (not the whole Windows App SDK
+package, which also brings AI, ML, Widgets and Search), and publishing leaves out the WinUI strings
+of the Windows languages the app is not translated to.
+
 The app is portable: the settings (`WinUI.settings.json`) and the log (`DriverStoreExplorer.WinUI.log`)
 are kept in the folder of the exe. Only if that folder can't be written to they go to
 `%LOCALAPPDATA%\DriverStoreExplorer`.

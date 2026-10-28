@@ -87,9 +87,9 @@
         <!-- A · Explorer with a details pane -->
         <Grid x:Name="ExplorerLayout" Grid.Row="2" Padding="8,0,16,8" ColumnSpacing="12">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="260" />
+                <ColumnDefinition x:Name="ExplorerNavColumn" Width="260" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="340" />
+                <ColumnDefinition x:Name="ExplorerDetailsColumn" Width="340" />
             </Grid.ColumnDefinitions>
 
             <ScrollViewer VerticalScrollBarVisibility="Auto">

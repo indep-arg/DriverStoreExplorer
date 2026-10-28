@@ -47,6 +47,11 @@ namespace Rapr.WinUI
         private bool busy;
         private bool updatingNavigation;
         private bool dialogOpen;
+        private bool loaded;
+
+        // Below this the list gets squeezed into a few pixels and the menu runs into the caption buttons.
+        private const int MinWindowWidth = 1200;
+        private const int MinWindowHeight = 600;
 
         public MainWindow()
         {
@@ -99,9 +104,15 @@ namespace Rapr.WinUI
             this.RootGrid.ActualThemeChanged += (sender, e) => this.UpdateCaptionButtonColors();
             this.AppTitleBar.SizeChanged += (sender, e) => this.UpdateTitleBarRegions();
             this.MainMenu.SizeChanged += (sender, e) => this.UpdateTitleBarRegions();
+            this.RootGrid.SizeChanged += (sender, e) => this.UpdateExplorerColumns();
             this.RootGrid.Loaded += async (sender, e) =>
             {
                 this.UpdateTitleBarRegions();
+
+                // The minimum is in device pixels, so it has to follow the scale when the window changes monitor.
+                this.ApplyMinimumSize();
+                this.RootGrid.XamlRoot.Changed += (root, args) => this.ApplyMinimumSize();
+
                 await this.RefreshAsync();
             };
         }
@@ -140,6 +151,30 @@ namespace Rapr.WinUI
                 workArea.Y + ((workArea.Height - height) / 2),
                 width,
                 height));
+        }
+
+        private void ApplyMinimumSize()
+        {
+            if (!(this.AppWindow.Presenter is OverlappedPresenter presenter))
+            {
+                return;
+            }
+
+            IntPtr hwnd = Win32Interop.GetWindowFromWindowId(this.AppWindow.Id);
+            double scale = this.RootGrid.XamlRoot?.RasterizationScale ?? (NativeMethods.GetDpiForWindow(hwnd) / 96.0);
+            RectInt32 workArea = DisplayArea.GetFromWindowId(this.AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+
+            // On a small screen the minimum can't be larger than the screen itself.
+            presenter.PreferredMinimumWidth = Math.Min((int)Math.Ceiling(MinWindowWidth * scale), workArea.Width);
+            presenter.PreferredMinimumHeight = Math.Min((int)Math.Ceiling(MinWindowHeight * scale), workArea.Height);
+        }
+
+        // With the window near its minimum the side panels give up some width to the list.
+        private void UpdateExplorerColumns()
+        {
+            bool narrow = this.RootGrid.ActualWidth < 1400;
+            this.ExplorerNavColumn.Width = new GridLength(narrow ? 220 : 260);
+            this.ExplorerDetailsColumn.Width = new GridLength(narrow ? 290 : 340);
         }
 
         // The menu sits in the title bar; let it get the clicks instead of dragging the window.
@@ -383,6 +418,7 @@ namespace Rapr.WinUI
                 row.PropertyChanged -= this.Row_PropertyChanged;
             }
 
+            this.loaded = true;
             this.insights = new DriverInsights(entries, this.driverStore.SupportDeviceNameColumn);
             string olderText = Strings.Get("WinUI_Tag_Older_Short");
             string noDeviceText = Strings.Get("View_No_Device");
@@ -405,6 +441,12 @@ namespace Rapr.WinUI
 
         private void UpdateNavigation()
         {
+            // Until the first scan there are no counts to show, only zeros and a shorter list of views.
+            if (!this.loaded)
+            {
+                return;
+            }
+
             this.updatingNavigation = true;
             try
             {
@@ -442,6 +484,11 @@ namespace Rapr.WinUI
         private void UpdateChips()
         {
             this.ChipPanel.Children.Clear();
+            if (!this.loaded)
+            {
+                return;
+            }
+
             var style = (Style)Application.Current.Resources["ChipStyle"];
 
             foreach ((DriverView view, string text) in ViewNames(shortAll: true).Where(pair => this.IsViewAvailable(pair.View)))
@@ -605,7 +652,7 @@ namespace Rapr.WinUI
                 ? (this.classFilter.Length == 0 ? Strings.Get("Navigation_Unknown_Class") : this.classFilter)
                 : ViewNames(shortAll: false).First(pair => pair.View == this.viewFilter).Text;
             this.ExplorerTitle.Text = title;
-            this.ExplorerSummary.Text = Summary(this.visibleRows);
+            this.ExplorerSummary.Text = this.loaded ? Summary(this.visibleRows) : string.Empty;
         }
 
         private static string Summary(IReadOnlyCollection<DriverRow> rows) =>
