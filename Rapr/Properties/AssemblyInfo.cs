@@ -36,4 +36,5 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyFileVersion("1.0.0.0")]
 [assembly: AssemblyInformationalVersion("1.0.0.0")]
 [assembly: NeutralResourcesLanguage("en")]
+[assembly: System.Runtime.Versioning.SupportedOSPlatform("windows6.1")]
 

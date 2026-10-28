@@ -13,22 +13,20 @@ using System.Security.Principal;
 using System.Text;
 using System.Windows.Forms;
 
-using Microsoft.Win32;
 using Microsoft.Win32.SafeHandles;
 
 namespace Rapr
 {
     public static class DSEFormHelper
     {
-        private const string AppCompatRegistry = @"Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers";
-        private const string RunAsAdminRegistryValue = "RUNASADMIN";
         private static readonly Version Win8Version = new Version(6, 2);
         private static readonly Version Win10Version = new Version(10, 0);
         private static readonly Version Win11Version = new Version(10, 0, 22000);
 
         public static string GetApplicationFolder()
         {
-            string assemblyLocation = Assembly.GetExecutingAssembly().Location;
+            // Assembly.Location is empty in a single-file app; the exe path is what we need anyway.
+            string assemblyLocation = Environment.ProcessPath;
 
             if (!string.IsNullOrEmpty(assemblyLocation))
             {
@@ -44,7 +42,7 @@ namespace Rapr
             }
             else
             {
-                return AppDomain.CurrentDomain.BaseDirectory;
+                return AppContext.BaseDirectory;
             }
         }
 
@@ -150,7 +148,8 @@ namespace Rapr
             ProcessStartInfo processInfo = new ProcessStartInfo
             {
                 Verb = "runas",
-                FileName = Assembly.GetExecutingAssembly().Location
+                FileName = Environment.ProcessPath,
+                UseShellExecute = true,
             };
 
             try
@@ -170,53 +169,6 @@ namespace Rapr
 
             Application.Exit();
             return true;
-        }
-
-        public static bool RunAsAdmin
-        {
-            get
-            {
-                using (var key = Registry.CurrentUser.OpenSubKey(AppCompatRegistry))
-                {
-                    string valueStr = (string)key?.GetValue(Assembly.GetExecutingAssembly().Location);
-                    return !string.IsNullOrEmpty(valueStr)
-                        && valueStr.Split(' ').Any(s => s == RunAsAdminRegistryValue);
-                }
-            }
-
-            set
-            {
-                using (var key = Registry.CurrentUser.CreateSubKey(AppCompatRegistry, RegistryKeyPermissionCheck.ReadWriteSubTree))
-                {
-                    if (key != null)
-                    {
-                        List<string> values = new List<string> { "~" };
-                        string keyStr = Assembly.GetExecutingAssembly().Location;
-                        string valueStr = (string)key.GetValue(keyStr);
-
-                        if (!string.IsNullOrEmpty(valueStr))
-                        {
-                            values = valueStr.Split(' ').ToList();
-                        }
-
-                        values.Remove(RunAsAdminRegistryValue);
-
-                        if (value)
-                        {
-                            values.Add(RunAsAdminRegistryValue);
-                        }
-
-                        if (values.Count == 1 && values[0] == "~")
-                        {
-                            key.DeleteValue(keyStr);
-                        }
-                        else
-                        {
-                            key.SetValue(keyStr, string.Join(" ", values), RegistryValueKind.String);
-                        }
-                    }
-                }
-            }
         }
 
         /// <summary>
@@ -277,58 +229,24 @@ namespace Rapr
 
         public static ICollection<CultureInfo> GetSupportedLanguage()
         {
+            // The list of Lang\Language.*.resx files is written into SupportedCultures at build time
+            // (see Rapr.csproj). Satellite assemblies are bundled inside the single-file exe, so they
+            // can't be found by scanning the application folder.
             HashSet<CultureInfo> supportedLanguage = new HashSet<CultureInfo>
             {
                 new CultureInfo("en")
             };
 
-            Assembly assembly = Assembly.GetExecutingAssembly();
-            var resoures = assembly.GetManifestResourceNames();
-
-            string resourcePrefix = $"{assembly.EntryPoint.DeclaringType.Namespace}.";
-            const string ResourceSuffix = ".resources.dll";
-
-            foreach (var resource in resoures)
+            const string Prefix = "Language.";
+            foreach (string resourceFile in SupportedCultures.ResourceFiles)
             {
-                if (resource.StartsWith(resourcePrefix) && resource.EndsWith(ResourceSuffix))
+                try
                 {
-                    string cultureName = resource.Substring(resourcePrefix.Length, resource.Length - resourcePrefix.Length - ResourceSuffix.Length);
-                    try
-                    {
-                        supportedLanguage.Add(new CultureInfo(cultureName));
-                    }
-                    catch (CultureNotFoundException)
-                    {
-                    }
+                    supportedLanguage.Add(new CultureInfo(resourceFile.Substring(Prefix.Length)));
                 }
-            }
-
-            string currentFolder = Path.GetDirectoryName(assembly.Location);
-            string satelliteFileName = assembly.GetName().Name + ResourceSuffix;
-
-            try
-            {
-                // Satellite assemblies live in <app folder>\<culture>\Rapr.resources.dll, so only
-                // the direct subfolders need to be checked.
-                foreach (var cultureFolder in new DirectoryInfo(currentFolder).EnumerateDirectories())
+                catch (CultureNotFoundException)
                 {
-                    if (!File.Exists(Path.Combine(cultureFolder.FullName, satelliteFileName)))
-                    {
-                        continue;
-                    }
-
-                    try
-                    {
-                        supportedLanguage.Add(new CultureInfo(cultureFolder.Name));
-                    }
-                    catch (CultureNotFoundException)
-                    {
-                    }
                 }
-            }
-            catch (Exception ex) when (ex is SecurityException || ex is UnauthorizedAccessException || ex is IOException)
-            {
-                Trace.TraceWarning($"Could not scan for satellite resource assemblies: {ex}");
             }
 
             return supportedLanguage;

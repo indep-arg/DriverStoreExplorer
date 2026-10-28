@@ -772,7 +772,7 @@ namespace JR.Utils.GUI.Forms
                 try
                 {
                     Cursor.Current = Cursors.WaitCursor;
-                    Process.Start(e.LinkText);
+                    Process.Start(new ProcessStartInfo(e.LinkText) { UseShellExecute = true });
                 }
                 catch (Exception)
                 {
@@ -821,11 +821,13 @@ namespace JR.Utils.GUI.Forms
             /// <summary>
             /// The text that is been used for the heading.
             /// </summary>
+            [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
             public string CaptionText { get; set; }
 
             /// <summary>
             /// The text that is been used in the FlexibleMessageBoxForm.
             /// </summary>
+            [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
             public string MessageText { get; set; }
 
             #endregion

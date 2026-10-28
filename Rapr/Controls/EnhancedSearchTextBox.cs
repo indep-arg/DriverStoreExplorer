@@ -305,6 +305,7 @@ namespace Rapr.Controls
         }
 
         [Browsable(true)]
+        [DefaultValue("")]
         public string PlaceholderText
         {
             get { return this.placeholderLabel?.Text ?? ""; }
@@ -330,6 +331,7 @@ namespace Rapr.Controls
             return this.textBox?.Focus() ?? false;
         }
 
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public new bool Enabled
         {
             get { return base.Enabled; }
