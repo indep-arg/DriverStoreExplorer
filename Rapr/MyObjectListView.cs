@@ -18,20 +18,24 @@ namespace Rapr
 
         private int layoutDpi;
 
+        private readonly StateImageCheckBoxRenderer checkBoxRenderer;
+
         public MyObjectListView()
         {
             // ObjectListView's renderers draw checkboxes with CheckBoxRenderer, which is always the
-            // light, unscaled one. Make whichever renderer is in use (the search swaps it) draw the
-            // images from InitializeStateImageList instead: DPI-sized, and dark in dark mode.
+            // light, unscaled one. Draw the images from InitializeStateImageList instead (DPI-sized,
+            // and dark in dark mode). The search swaps the default renderer for one with a text
+            // filter, so the filter is carried over on every lookup.
+            this.checkBoxRenderer = new StateImageCheckBoxRenderer(this);
             this.CellRendererGetter = (model, column) =>
             {
-                IRenderer renderer = column.Renderer ?? this.DefaultRenderer;
-                if (renderer is BaseRenderer baseRenderer)
+                if (column.Renderer != null)
                 {
-                    baseRenderer.UseCustomCheckboxImages = true;
+                    return column.Renderer;
                 }
 
-                return renderer;
+                this.checkBoxRenderer.Filter = (this.DefaultRenderer as HighlightTextRenderer)?.Filter;
+                return this.checkBoxRenderer;
             };
         }
 
@@ -303,6 +307,51 @@ namespace Rapr
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Draws row checkboxes from the list's state images, chosen by the row's check state.
+        /// (ObjectListView's own UseCustomCheckboxImages picks them by StateImageIndex, which is -1
+        /// with UseCompatibleStateImageBehavior off, so it drew nothing.)
+        /// </summary>
+        private sealed class StateImageCheckBoxRenderer : HighlightTextRenderer
+        {
+            private readonly MyObjectListView owner;
+
+            public StateImageCheckBoxRenderer(MyObjectListView owner)
+            {
+                this.owner = owner;
+            }
+
+            protected override Size CalculateCheckBoxSize(Graphics g) =>
+                this.owner.StateImageList?.ImageSize ?? base.CalculateCheckBoxSize(g);
+
+            protected override int DrawCheckBox(Graphics g, Rectangle r)
+            {
+                ImageList images = this.owner.StateImageList;
+                int index;
+                switch (this.ListItem.CheckState)
+                {
+                    case CheckState.Checked:
+                        index = 1;
+                        break;
+                    case CheckState.Indeterminate:
+                        index = 2;
+                        break;
+                    default:
+                        index = 0;
+                        break;
+                }
+
+                if (this.IsPrinting || images == null || index >= images.Images.Count)
+                {
+                    return base.DrawCheckBox(g, r);
+                }
+
+                Size size = images.ImageSize;
+                g.DrawImage(images.Images[index], r.X, this.AlignVertically(r, size.Height), size.Width, size.Height);
+                return size.Width + 4;
+            }
         }
 
         private OLVColumn GetColumnOrNull(int index) =>
