@@ -420,29 +420,55 @@ namespace Rapr.Tests
         }
 
         [TestMethod]
-        public void TypedDriverListRestoresUntypedViewState()
+        public void ViewStateRoundTripsIncludingTheSecondarySort()
         {
-            using (var previous = new ObjectListView())
-            using (var current = new MyObjectListView())
+            using (var previous = CreateListWithColumns())
+            using (var current = CreateListWithColumns())
             {
-                foreach (var list in new ObjectListViewBase[] { previous, current })
-                {
-                    var column = new OLVColumn("INF", nameof(DriverStoreEntry.DriverInfName));
-                    list.AllColumns.Add(column);
-                    list.Columns.Add(column);
-                }
-
                 previous.AllColumns[0].Width = 173;
+                previous.AllColumns[1].IsVisible = false;
                 previous.PrimarySortColumn = previous.AllColumns[0];
                 previous.PrimarySortOrder = SortOrder.Descending;
+                previous.SecondarySortColumn = previous.AllColumns[1];
+                previous.SecondarySortOrder = SortOrder.Ascending;
                 previous.ShowGroups = false;
 
                 Assert.IsTrue(current.RestoreState(previous.SaveState()));
                 Assert.AreEqual(173, current.AllColumns[0].Width);
+                Assert.IsFalse(current.AllColumns[1].IsVisible);
                 Assert.AreSame(current.AllColumns[0], current.PrimarySortColumn);
                 Assert.AreEqual(SortOrder.Descending, current.PrimarySortOrder);
+                Assert.AreSame(current.AllColumns[1], current.SecondarySortColumn);
+                Assert.AreEqual(SortOrder.Ascending, current.SecondarySortOrder);
                 Assert.IsFalse(current.ShowGroups);
             }
+        }
+
+        [TestMethod]
+        public void ViewStateFromOlderVersionsIsIgnored()
+        {
+            using (var list = CreateListWithColumns())
+            {
+                // Older versions saved a BinaryFormatter stream, which starts with these bytes.
+                byte[] binaryFormatterState = { 0x00, 0x01, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF };
+
+                Assert.IsFalse(list.RestoreState(binaryFormatterState));
+                Assert.IsFalse(list.RestoreState(Array.Empty<byte>()));
+                Assert.AreEqual(2, list.AllColumns.Count);
+            }
+        }
+
+        private static MyObjectListView CreateListWithColumns()
+        {
+            var list = new MyObjectListView();
+            foreach (string aspect in new[] { nameof(DriverStoreEntry.DriverInfName), nameof(DriverStoreEntry.DriverClass) })
+            {
+                var column = new OLVColumn(aspect, aspect);
+                list.AllColumns.Add(column);
+                list.Columns.Add(column);
+            }
+
+            return list;
         }
 
         private static DriverStoreEntry CreateDriver(string infName, int version)

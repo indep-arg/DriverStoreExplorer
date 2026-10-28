@@ -29,6 +29,8 @@
          its BinaryFormatter-based SaveState/RestoreState is replaced in MyObjectListView. -->
     <PackageReference Include="ObjectListView.WinForms" Version="3.0.10-preview" NoWarn="NU1701" />
     <PackageReference Include="PortableSettingsProvider" Version="0.2.5" />
+    <!-- Reads ObjectListView's icons without BinaryFormatter; see ObjectListViewResources.cs. -->
+    <PackageReference Include="System.Formats.Nrbf" Version="10.0.0" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="icon.ico" />
