@@ -27,6 +27,9 @@ namespace Rapr
         [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
         internal static extern int SetWindowTheme(IntPtr hWnd, string pszSubAppName, string pszSubIdList);
 
+        [DllImport("user32.dll")]
+        internal static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         public static extern SafeFileHandle CreateFile(
             string lpFileName,

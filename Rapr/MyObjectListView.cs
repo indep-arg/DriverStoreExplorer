@@ -13,7 +13,27 @@ namespace Rapr
 {
     public sealed class MyObjectListView : TypedObjectListView<DriverStoreEntry>
     {
+        private const int LVM_SETEXTENDEDLISTVIEWSTYLE = 0x1036;
+        private const int LVS_EX_GRIDLINES = 0x1;
+
         private int layoutDpi;
+
+        public MyObjectListView()
+        {
+            // ObjectListView's renderers draw checkboxes with CheckBoxRenderer, which is always the
+            // light, unscaled one. Make whichever renderer is in use (the search swaps it) draw the
+            // images from InitializeStateImageList instead: DPI-sized, and dark in dark mode.
+            this.CellRendererGetter = (model, column) =>
+            {
+                IRenderer renderer = column.Renderer ?? this.DefaultRenderer;
+                if (renderer is BaseRenderer baseRenderer)
+                {
+                    baseRenderer.UseCustomCheckboxImages = true;
+                }
+
+                return renderer;
+            };
+        }
 
         /// <summary>
         /// Gets whether the app runs with WinForms' dark color mode (Options > Theme).
@@ -82,13 +102,14 @@ namespace Rapr
         {
             // The header is custom drawn whenever the list is sorted, so give it dark colors.
             var header = new HeaderFormatStyle();
-            header.SetBackColor(Color.FromArgb(43, 43, 43));
+            header.SetBackColor(Color.FromArgb(40, 40, 40));
             header.SetForeColor(Color.FromArgb(222, 222, 222));
-            header.Hot.BackColor = Color.FromArgb(60, 60, 60);
-            header.Pressed.BackColor = Color.FromArgb(75, 75, 75);
+            header.Hot.BackColor = Color.FromArgb(55, 55, 55);
+            header.Pressed.BackColor = Color.FromArgb(70, 70, 70);
             foreach (HeaderStateStyle state in new[] { header.Normal, header.Hot, header.Pressed })
             {
-                state.FrameColor = Color.FromArgb(70, 70, 70);
+                // A faint outline just separates the columns.
+                state.FrameColor = Color.FromArgb(52, 52, 52);
                 state.FrameWidth = 1;
             }
 
@@ -105,6 +126,10 @@ namespace Rapr
                 if (this.IsHandleCreated)
                 {
                     _ = SafeNativeMethods.SetWindowTheme(this.Handle, "DarkMode_ItemsView", null);
+
+                    // WinForms re-applies the extended styles for dark mode; make sure the grid
+                    // lines it drew across the group rows stay off.
+                    _ = SafeNativeMethods.SendMessage(this.Handle, LVM_SETEXTENDEDLISTVIEWSTYLE, (IntPtr)LVS_EX_GRIDLINES, IntPtr.Zero);
                 }
             }));
         }
