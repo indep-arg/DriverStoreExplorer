@@ -36,7 +36,9 @@
   <!-- DPI awareness is set by ApplicationHighDpiMode in Rapr.csproj. -->
 
   <!-- Enable themes for Windows common controls and dialogs (Windows XP and later) -->
-  <!--
+  <!-- Common Controls v6 for the whole process. Without it, WinForms creates image lists with v6
+       (visual styles) while comctl32.dll can also resolve to the old v5, which rejects them:
+       the checkbox images failed with "cannot add the image to the ImageList". -->
   <dependency>
     <dependentAssembly>
       <assemblyIdentity
@@ -49,6 +51,5 @@
         />
     </dependentAssembly>
   </dependency>
-  -->
 
 </assembly>
