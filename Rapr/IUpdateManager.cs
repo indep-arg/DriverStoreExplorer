@@ -7,7 +7,7 @@ namespace Rapr
     {
         bool HandlesRestart { get; }
 
-        Task<VersionInfo> GetLatestVersionInfo();
+        Task<VersionInfo?> GetLatestVersionInfo();
 
         Task ApplyUpdateAsync(VersionInfo versionInfo, IProgress<float> progress);
     }

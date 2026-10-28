@@ -14,12 +14,12 @@ namespace Rapr.Utils
         /// <summary>
         /// Name of the OEM INF in driver store
         /// </summary>
-        public string DriverPublishedName { get; set; }
+        public string? DriverPublishedName { get; set; }
 
         /// <summary>
         /// Driver Original INF Name
         /// </summary>
-        public string DriverInfName { get; set; }
+        public string? DriverInfName { get; set; }
 
         public bool HasDeviceAssociation => !string.IsNullOrEmpty(this.DeviceId)
             || !string.IsNullOrEmpty(this.DeviceName) || this.DevicePresent.HasValue;
@@ -27,12 +27,12 @@ namespace Rapr.Utils
         /// <summary>
         /// Driver package provider
         /// </summary>
-        public string DriverPkgProvider { get; set; }
+        public string? DriverPkgProvider { get; set; }
 
         /// <summary>
         /// Driver class (ex., "System Devices")
         /// </summary>
-        public string DriverClass { get; set; }
+        public string? DriverClass { get; set; }
 
         /// <summary>
         /// Driver ExtensionId.
@@ -55,12 +55,12 @@ namespace Rapr.Utils
         /// <summary>
         /// Sys file version
         /// </summary>
-        public Version DriverVersion { get; set; }
+        public Version? DriverVersion { get; set; }
 
         /// <summary>
         /// Signer name. Empty if not WHQLd. 
         /// </summary>
-        public string DriverSignerName { get; set; }
+        public string? DriverSignerName { get; set; }
 
         /// <summary>
         /// Estimated driver size on disk.
@@ -70,12 +70,24 @@ namespace Rapr.Utils
         /// <summary>
         /// The folder that contains the driver.
         /// </summary>
-        public string DriverFolderLocation { get; set; }
+        public string? DriverFolderLocation { get; set; }
 
         /// <summary>
         /// The folder name (not include full path) that contains the driver.
         /// </summary>
-        public string DriverFolderName => Path.GetFileName(DriverFolderLocation);
+        public string? DriverFolderName => Path.GetFileName(DriverFolderLocation);
+
+        /// <summary>
+        /// The full path of the INF inside the driver store folder.
+        /// </summary>
+        public string InfFullPath => Path.Combine(this.DriverFolderLocation ?? string.Empty, this.DriverInfName ?? string.Empty);
+
+        /// <summary>
+        /// The published name (oemNN.inf) that the delete and uninstall APIs take.
+        /// </summary>
+        public string RequirePublishedName() => !string.IsNullOrEmpty(this.DriverPublishedName)
+            ? this.DriverPublishedName
+            : throw new InvalidOperationException($"The driver package {this.DriverInfName} has no published name.");
 
         /// <summary>
         /// Generate a folder name following the DriversBackup naming convention:
@@ -88,7 +100,7 @@ namespace Rapr.Utils
             // This happens when DeviceName is null/empty and we had to fall back to INF name
             bool isDriverWithoutDevice = string.IsNullOrEmpty(this.DeviceName);
 
-            string folderName = !isDriverWithoutDevice
+            string folderName = !isDriverWithoutDevice && this.DeviceName != null
                 ? this.DeviceName
                 : !string.IsNullOrEmpty(this.DriverInfName)
                     ? Path.GetFileNameWithoutExtension(this.DriverInfName)
@@ -170,12 +182,12 @@ namespace Rapr.Utils
         /// <summary>
         /// Associated device Id (device instance path).
         /// </summary>
-        public string DeviceId { get; set; }
+        public string? DeviceId { get; set; }
 
         /// <summary>
         /// Associated device name.
         /// </summary>
-        public string DeviceName { get; set; }
+        public string? DeviceName { get; set; }
 
         /// <summary>
         /// Whether the associated device present in the system or not.
@@ -196,14 +208,14 @@ namespace Rapr.Utils
         /// <summary>
         /// List of driver files (sys, DLLs) in the driver package
         /// </summary>
-        public List<string> DriverFiles { get; set; }
+        public List<string>? DriverFiles { get; set; }
 
         public override string ToString()
         {
             return $"PublishedName: {this.DriverPublishedName}, InfName: {this.DriverInfName}, Class: {this.DriverClass}, Version: {this.DriverVersion}, DeviceName: {this.DeviceName}";
         }
 
-        public void SetDriverDateAndVersion(string value)
+        public void SetDriverDateAndVersion(string? value)
         {
             if (!string.IsNullOrEmpty(value))
             {
@@ -218,7 +230,7 @@ namespace Rapr.Utils
                         this.DriverDate = driverDate;
                     }
 
-                    if (Version.TryParse(dateAndVersion[1].Trim(), out Version driverVersion))
+                    if (Version.TryParse(dateAndVersion[1].Trim(), out Version? driverVersion))
                     {
                         this.DriverVersion = driverVersion;
                     }
@@ -230,7 +242,7 @@ namespace Rapr.Utils
         {
             get
             {
-                string oemInfName = this.DriverPublishedName;
+                string? oemInfName = this.DriverPublishedName;
 
                 if (!string.IsNullOrEmpty(oemInfName))
                 {
@@ -373,7 +385,7 @@ namespace Rapr.Utils
 
         public static string GetSizeRangeName(long size)
         {
-            if (SizeRangeToName.TryGetValue(size, out string name))
+            if (SizeRangeToName.TryGetValue(size, out string? name))
             {
                 return name;
             }

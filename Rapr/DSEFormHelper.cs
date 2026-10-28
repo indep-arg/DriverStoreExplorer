@@ -26,7 +26,7 @@ namespace Rapr
         public static string GetApplicationFolder()
         {
             // Assembly.Location is empty in a single-file app; the exe path is what we need anyway.
-            string assemblyLocation = Environment.ProcessPath;
+            string? assemblyLocation = Environment.ProcessPath;
 
             if (!string.IsNullOrEmpty(assemblyLocation))
             {
@@ -38,7 +38,7 @@ namespace Rapr
                     // Resolve the real path
                     assemblyLocation = GetFinalPathName(assemblyLocation);
                 }
-                return Path.GetDirectoryName(assemblyLocation);
+                return Path.GetDirectoryName(assemblyLocation) ?? AppContext.BaseDirectory;
             }
             else
             {
@@ -58,21 +58,22 @@ namespace Rapr
                     throw new Win32Exception(Marshal.GetLastWin32Error());
                 }
 
-                StringBuilder finalPath = new StringBuilder(512);
-                int result = SafeNativeMethods.GetFinalPathNameByHandle(handle, finalPath, finalPath.Capacity, 0);
-                if (result > finalPath.Capacity)
+                char[] finalPath = new char[512];
+                int result = SafeNativeMethods.GetFinalPathNameByHandle(handle, finalPath, finalPath.Length, 0);
+                if (result > finalPath.Length)
                 {
                     // The buffer was too small; result is the size needed.
-                    finalPath.Capacity = result;
-                    result = SafeNativeMethods.GetFinalPathNameByHandle(handle, finalPath, finalPath.Capacity, 0);
+                    finalPath = new char[result];
+                    result = SafeNativeMethods.GetFinalPathNameByHandle(handle, finalPath, finalPath.Length, 0);
                 }
 
-                if (result == 0 || result > finalPath.Capacity)
+                if (result == 0 || result > finalPath.Length)
                 {
                     throw new Win32Exception(Marshal.GetLastWin32Error());
                 }
 
-                return RemoveExtendedPathPrefix(finalPath.ToString());
+                // On success, result is the length without the terminating null.
+                return RemoveExtendedPathPrefix(new string(finalPath, 0, result));
             }
         }
 
@@ -109,10 +110,6 @@ namespace Rapr
                 return false;
             }
         }
-
-        public static bool IsOSSupported =>
-            Environment.OSVersion.Platform == PlatformID.Win32NT
-            && (Environment.OSVersion.Version.Major >= 6);
 
         public static bool IsWin8OrNewer =>
             Environment.OSVersion.Platform == PlatformID.Win32NT
@@ -178,9 +175,9 @@ namespace Rapr
         /// <param name="filePath">The path to the file that contains an image.</param>
         /// <returns>The System.Drawing.Icon representation of the image contained in the specified file.</returns>
         /// <exception cref="System.ArgumentException">filePath does not indicate a valid file.</exception>
-        public static Icon ExtractAssociatedIcon(string filePath)
+        public static Icon? ExtractAssociatedIcon(string filePath)
         {
-            int index = 0;
+            ushort index = 0;
 
             Uri uri;
 
@@ -206,12 +203,11 @@ namespace Rapr
                     throw new FileNotFoundException(filePath);
                 }
 
-                StringBuilder iconPath = new StringBuilder(filePath, 260);
+                // The function may write another path back into the buffer, which needs MAX_PATH characters.
+                char[] iconPath = new char[Math.Max(260, filePath.Length + 1)];
+                filePath.CopyTo(0, iconPath, 0, filePath.Length);
 
-                IntPtr handle = SafeNativeMethods.ExtractAssociatedIcon(
-                    new HandleRef(null, IntPtr.Zero),
-                    iconPath,
-                    ref index);
+                IntPtr handle = SafeNativeMethods.ExtractAssociatedIcon(IntPtr.Zero, iconPath, ref index);
 
                 if (handle != IntPtr.Zero)
                 {

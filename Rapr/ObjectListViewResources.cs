@@ -26,10 +26,10 @@ namespace Rapr
         [ModuleInitializer]
         internal static void Install()
         {
-            Type resources = typeof(ObjectListView).Assembly.GetType(ResourcesTypeName);
-            FieldInfo resourceManager = resources?.GetField("resourceMan", BindingFlags.Static | BindingFlags.NonPublic);
+            Type? resources = typeof(ObjectListView).Assembly.GetType(ResourcesTypeName);
+            FieldInfo? resourceManager = resources?.GetField("resourceMan", BindingFlags.Static | BindingFlags.NonPublic);
 
-            if (resourceManager == null)
+            if (resources == null || resourceManager == null)
             {
                 Trace.TraceWarning("ObjectListView's resource manager was not found; its icons may fail to load.");
                 return;
@@ -49,19 +49,24 @@ namespace Rapr
                 throw new InvalidDataException($"Expected a serialized bitmap, found {record.TypeName.FullName}.");
             }
 
-            return ((SZArrayRecord<byte>)record.GetArrayRecord("Data")).GetArray();
+            return (record.GetArrayRecord("Data") as SZArrayRecord<byte>)?.GetArray()
+                ?? throw new InvalidDataException("The serialized bitmap has no data.");
         }
 
         private sealed class NrbfBitmapResourceManager : ResourceManager
         {
+            private readonly Assembly assembly;
+
             public NrbfBitmapResourceManager(string baseName, Assembly assembly)
                 : base(baseName, assembly)
             {
+                this.assembly = assembly;
             }
 
-            public override object GetObject(string name, CultureInfo culture)
+            public override object? GetObject(string name, CultureInfo? culture)
             {
-                using (Stream stream = this.MainAssembly.GetManifestResourceStream(this.BaseName + ".resources"))
+                using (Stream stream = this.assembly.GetManifestResourceStream(this.BaseName + ".resources")
+                    ?? throw new MissingManifestResourceException(this.BaseName))
                 using (var reader = new ResourceReader(stream))
                 {
                     reader.GetResourceData(name, out _, out byte[] data);

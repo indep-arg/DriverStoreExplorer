@@ -12,7 +12,7 @@ namespace Rapr
             this HttpClient client,
             Uri requestUri,
             Stream destination,
-            IProgress<float> progress = null,
+            IProgress<float>? progress = null,
             CancellationToken cancellationToken = default(CancellationToken))
         {
             if (client == null)

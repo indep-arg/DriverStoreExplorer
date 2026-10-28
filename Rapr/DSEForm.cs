@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
@@ -13,8 +14,6 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 
 using BrightIdeasSoftware;
-
-using JR.Utils.GUI.Forms;
 
 using Rapr.Lang;
 using Rapr.Properties;
@@ -49,52 +48,21 @@ namespace Rapr
             return new UpdateManager();
         }
 
+        // For strings added after Language.Designer.cs was last generated.
+        private static string LocalizedText(string name)
+        {
+            return Language.ResourceManager.GetString(name, Language.Culture) ?? name;
+        }
+
         private static readonly ICollection<CultureInfo> SupportedLanguage = DSEFormHelper.GetSupportedLanguage();
 
         private readonly Timer UpdateCheckedItemSizeTimer;
-        private Timer searchDebounceTimer;
+        private Timer? searchDebounceTimer;
         private const int Delay = 100;
         private const int SearchDebounceDelay = 300; // 0.3 seconds
 
         public DSEForm()
         {
-            if (!DSEFormHelper.IsOSSupported)
-            {
-                this.ShowMessageBox(
-                    Language.Message_Requires_Later_OS,
-                    Language.Product_Name,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-
-                Application.Exit();
-            }
-
-            if (!DSEFormHelper.IsRunAsAdmin)
-            {
-                if (!DSEFormHelper.IsElevationAttempted)
-                {
-                    try
-                    {
-                        if (DSEFormHelper.RunAsAdministrator())
-                        {
-                            return;
-                        }
-                    }
-                    catch (Win32Exception)
-                    {
-                    }
-                }
-
-                this.ShowMessageBox(
-                    Language.Message_Requires_Admin,
-                    Language.Product_Name,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
-
-                Application.Exit();
-                return;
-            }
-
             var lang = Settings.Default.Language;
             if (lang != null && !CultureInfo.InvariantCulture.Equals(lang))
             {
@@ -109,6 +77,7 @@ namespace Rapr
             this.Icon = DSEFormHelper.ExtractAssociatedIcon(Application.ExecutablePath);
             this.BuildLanguageMenu();
             this.SetupOptionsMenu();
+            this.SetupToolbar();
 
             this.lstDriverStoreEntries.PrimarySortColumn = this.driverClassColumn;
             this.lstDriverStoreEntries.PrimarySortOrder = SortOrder.Ascending;
@@ -129,15 +98,16 @@ namespace Rapr
                 this.UpdateCheckedItemSizeTimer.Stop();
                 this.UpdateCheckedItemSize();
             };
-            this.searchDebounceTimer = new Timer { Interval = SearchDebounceDelay };
-            this.searchDebounceTimer.Tick += (sender, e) =>
+            var searchTimer = new Timer { Interval = SearchDebounceDelay };
+            searchTimer.Tick += (sender, e) =>
             {
                 if (!this.operationInProgress)
                 {
-                    this.searchDebounceTimer.Stop();
+                    searchTimer.Stop();
                     this.UpdateSearchFilter();
                 }
             };
+            this.searchDebounceTimer = searchTimer;
         }
 
         /// <summary>
@@ -175,19 +145,16 @@ namespace Rapr
             {
                 Settings.Default.DriverStoreOption = driverStoreOption.ToString();
 
-                if (this.driverStore.Type == DriverStoreType.Online)
-                {
-                    this.UpdateDriverStore(DriverStoreFactory.CreateOnlineDriverStore());
-                }
-                else
-                {
-                    this.UpdateDriverStore(DriverStoreFactory.CreateOfflineDriverStore(this.driverStore.OfflineStoreLocation));
-                }
+                // Only offline stores have a location.
+                this.UpdateDriverStore(this.driverStore.OfflineStoreLocation is string imagePath
+                    ? DriverStoreFactory.CreateOfflineDriverStore(imagePath)
+                    : DriverStoreFactory.CreateOnlineDriverStore());
 
                 await this.PopulateUIWithDriverStoreEntries().ConfigureAwait(true);
             }
         }
 
+        [MemberNotNull(nameof(driverStore))]
         private void UpdateDriverStore(IDriverStore driverStore)
         {
             this.driverStore = driverStore;
@@ -311,7 +278,7 @@ namespace Rapr
             }
             else
             {
-                ToolStripMenuItem defaultLanguageMenuItem = null;
+                ToolStripMenuItem? defaultLanguageMenuItem = null;
                 bool currentUILanauageSupported = false;
 
                 foreach (var item in SupportedLanguage)
@@ -348,6 +315,7 @@ namespace Rapr
 
         // Called after every InitializeComponent(), including when the language is switched,
         // so the option menu items always reflect the saved settings.
+        [MemberNotNull(nameof(warnBeforeSelectingUnusedDriversStripMenuItem))]
         private void SetupOptionsMenu()
         {
             this.includeBootCriticalDriversStripMenuItem.Checked = Settings.Default.IncludeBootCriticalInOldDriverSelection;
@@ -357,12 +325,12 @@ namespace Rapr
             {
                 CheckOnClick = true,
                 Checked = Settings.Default.WarnBeforeSelectingUnusedDrivers,
-                Text = Language.ResourceManager.GetString("Menu_Options_WarnBeforeSelectingUnusedDrivers", Language.Culture),
+                Text = LocalizedText("Menu_Options_WarnBeforeSelectingUnusedDrivers"),
             };
             this.warnBeforeSelectingUnusedDriversStripMenuItem.Click += this.WarnBeforeSelectingUnusedDriversStripMenuItem_Click;
             this.optionsStripMenuItem.DropDownItems.Add(this.warnBeforeSelectingUnusedDriversStripMenuItem);
 
-            var themeMenu = new ToolStripMenuItem(Language.ResourceManager.GetString("Menu_Options_Theme", Language.Culture));
+            var themeMenu = new ToolStripMenuItem(LocalizedText("Menu_Options_Theme"));
             foreach (var (value, textKey) in new[]
             {
                 ("System", "Menu_Options_Theme_System"),
@@ -370,7 +338,7 @@ namespace Rapr
                 ("Dark", "Menu_Options_Theme_Dark"),
             })
             {
-                var item = new ToolStripMenuItem(Language.ResourceManager.GetString(textKey, Language.Culture))
+                var item = new ToolStripMenuItem(LocalizedText(textKey))
                 {
                     Tag = value,
                     Checked = string.Equals(Settings.Default.ColorMode, value, StringComparison.OrdinalIgnoreCase),
@@ -382,16 +350,19 @@ namespace Rapr
             this.optionsStripMenuItem.DropDownItems.Add(themeMenu);
         }
 
-        private void ThemeMenuItem_Click(object sender, EventArgs e)
+        private void ThemeMenuItem_Click(object? sender, EventArgs e)
         {
-            var selected = (ToolStripMenuItem)sender;
-            string colorMode = (string)selected.Tag;
+            if (!(sender is ToolStripMenuItem selected) || !(selected.Tag is string colorMode))
+            {
+                return;
+            }
+
             if (string.Equals(Settings.Default.ColorMode, colorMode, StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
 
-            foreach (ToolStripItem item in selected.Owner.Items)
+            foreach (ToolStripItem item in selected.Owner?.Items.Cast<ToolStripItem>() ?? Enumerable.Empty<ToolStripItem>())
             {
                 if (item is ToolStripMenuItem menuItem)
                 {
@@ -402,12 +373,27 @@ namespace Rapr
             Settings.Default.ColorMode = colorMode;
             Settings.Default.Save();
 
-            MessageBox.Show(
-                this,
-                Language.ResourceManager.GetString("Message_Theme_Restart", Language.Culture),
-                Language.Product_Name,
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
+            var restartNow = new TaskDialogButton(LocalizedText("Dialog_Restart_Now"));
+            var page = new TaskDialogPage
+            {
+                Caption = Language.Product_Name,
+                Text = LocalizedText("Message_Theme_Restart"),
+                Icon = TaskDialogIcon.Information,
+                Buttons = { TaskDialogButton.Close },
+                DefaultButton = TaskDialogButton.Close,
+            };
+
+            // Don't offer it in the middle of a delete or export. Otherwise only the list is lost,
+            // and it is read again on start.
+            if (!this.operationInProgress)
+            {
+                page.Buttons.Insert(0, restartNow);
+            }
+
+            if (TaskDialog.ShowDialog(this, page, TaskDialogStartupLocation.CenterOwner) == restartNow)
+            {
+                Application.Restart();
+            }
         }
 
         private void EnsureOnScreen()
@@ -429,7 +415,7 @@ namespace Rapr
             this.Location = newLocation;
         }
 
-        private async void DSEForm_Shown(object sender, EventArgs e)
+        private async void DSEForm_Shown(object? sender, EventArgs e)
         {
             this.savedBackColor = this.lblStatus.BackColor;
             this.savedForeColor = this.lblStatus.ForeColor;
@@ -439,12 +425,12 @@ namespace Rapr
             await this.PopulateUIWithDriverStoreEntries().ConfigureAwait(true);
         }
 
-        private void DSEForm_FormClosed(object sender, FormClosedEventArgs e)
+        private void DSEForm_FormClosed(object? sender, FormClosedEventArgs e)
         {
             Trace.TraceInformation($"Shutting down - reason {e.CloseReason}");
         }
 
-        private async void ButtonEnumerate_Click(object sender, EventArgs e)
+        private async void ButtonEnumerate_Click(object? sender, EventArgs e)
         {
             await this.PopulateUIWithDriverStoreEntries().ConfigureAwait(true);
         }
@@ -479,7 +465,7 @@ namespace Rapr
             }
         }
 
-        private async void ButtonDelete_Click(object sender, EventArgs e)
+        private async void ButtonDelete_Click(object? sender, EventArgs e)
         {
             if (this.lstDriverStoreEntries.CheckedObjects.Count == 0)
             {
@@ -491,7 +477,6 @@ namespace Rapr
 
         private async Task DeleteDriverStoreEntries(IEnumerable<DriverStoreEntry> entries)
         {
-            StringBuilder msgWarning = new StringBuilder();
             var driverStoreEntries = entries
                 .OrderByColumnName(this.lstDriverStoreEntries.PrimarySortColumn?.AspectName, this.lstDriverStoreEntries.PrimarySortOrder == SortOrder.Ascending)
                 .ThenByColumnName(this.lstDriverStoreEntries.SecondarySortColumn?.AspectName, this.lstDriverStoreEntries.SecondarySortOrder == SortOrder.Ascending)
@@ -499,34 +484,36 @@ namespace Rapr
 
             if (driverStoreEntries?.Count > 0)
             {
+                string heading;
+                string? packageList = null;
+
                 if (driverStoreEntries.Count == 1)
                 {
-                    msgWarning.AppendFormat(
+                    heading = string.Format(
                         this.cbForceDeletion.Checked ? Language.Message_ForceDelete_Single_Package : Language.Message_Delete_Single_Package,
                         driverStoreEntries[0].DriverInfName,
                         $"{driverStoreEntries[0].DriverVersion}, {DriverStoreEntry.GetBytesReadable(driverStoreEntries[0].DriverSize)}");
                 }
                 else
                 {
-                    msgWarning.AppendFormat(
+                    heading = string.Format(
                         this.cbForceDeletion.Checked ? Language.Message_ForceDelete_Multiple_Packages : Language.Message_Delete_Multiple_Packages,
                         driverStoreEntries.Count);
 
-                    msgWarning.AppendLine();
-
-                    foreach (DriverStoreEntry item in driverStoreEntries)
-                    {
-                        msgWarning.AppendLine($"{item.DriverInfName} - {item.DriverVersion} - {DriverStoreEntry.GetBytesReadable(item.DriverSize)}");
-                    }
+                    packageList = string.Join(
+                        Environment.NewLine,
+                        driverStoreEntries.Select(item => $"{item.DriverInfName} - {item.DriverVersion} - {DriverStoreEntry.GetBytesReadable(item.DriverSize)}"));
                 }
 
-                msgWarning.AppendLine().Append(Language.Message_Sure);
-
-                if (DialogResult.OK == this.ShowMessageBox(
-                    msgWarning.ToString(),
+                if (Dialogs.Confirm(
+                    this,
+                    heading,
+                    Language.Message_Sure,
                     Language.Message_Title_Warning,
-                    MessageBoxButtons.OKCancel,
-                    MessageBoxIcon.Warning))
+                    Language.Context_Delete,
+                    packageList,
+                    verificationText: null,
+                    out _))
                 {
                     await this.DeleteDriverStorePackages(driverStoreEntries).ConfigureAwait(true);
                 }
@@ -618,7 +605,7 @@ namespace Rapr
                 }
                 else
                 {
-                    string fullResult = null;
+                    string? fullResult = null;
 
                     if (driverStoreEntries.Count == 1)
                     {
@@ -660,9 +647,9 @@ namespace Rapr
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "<Pending>")]
-        private async void ButtonAddDriver_Click(object sender, EventArgs e)
+        private async void ButtonAddDriver_Click(object? sender, EventArgs e)
         {
-            string infPath = FolderPicker.Pick(this, FolderPicker.AddDrivers, Language.Dialog_Select_Inf_Folder);
+            string? infPath = FolderPicker.Pick(this, FolderPicker.AddDrivers, Language.Dialog_Select_Inf_Folder);
             if (infPath == null)
             {
                 return;
@@ -787,7 +774,7 @@ namespace Rapr
             }
         }
 
-        private void ContextMenuStrip_Opening(object sender, CancelEventArgs e)
+        private void ContextMenuStrip_Opening(object? sender, CancelEventArgs e)
         {
             if (this.operationInProgress)
             {
@@ -864,7 +851,7 @@ namespace Rapr
         }
 
         // Function to switch between "selected" and "unselected" states
-        private void CtxMenuSelectAll_Click(object sender, EventArgs e)
+        private void CtxMenuSelectAll_Click(object? sender, EventArgs e)
         {
             // Check if there are any entries
             if (this.lstDriverStoreEntries.Objects != null)
@@ -881,21 +868,20 @@ namespace Rapr
             }
         }
 
-        private void CtxMenuSelect_Click(object sender, EventArgs e)
+        private void CtxMenuSelect_Click(object? sender, EventArgs e)
         {
             if (this.lstDriverStoreEntries.Objects != null)
             {
                 List<DriverStoreEntry> list = new List<DriverStoreEntry>();
-                if (this.lstDriverStoreEntries.CheckedObjects?.Count > 0)
-                {
-                    list.AddRange(this.lstDriverStoreEntries.CheckedObjects);
-                }
+                var checkedItems = new HashSet<DriverStoreEntry>(
+                    this.lstDriverStoreEntries.CheckedObjects ?? Array.Empty<DriverStoreEntry>());
+                list.AddRange(checkedItems);
 
                 if (this.lstDriverStoreEntries.SelectedObjects?.Count > 0)
                 {
                     if (this.lstDriverStoreEntries
                         .SelectedObjects
-                        .All(i => this.lstDriverStoreEntries.CheckedObjects.Contains(i)))
+                        .All(checkedItems.Contains))
                     {
                         foreach (var item in this.lstDriverStoreEntries.SelectedObjects)
                         {
@@ -912,7 +898,7 @@ namespace Rapr
             }
         }
 
-        private void CtxMenuInvertSelection_Click(object sender, System.EventArgs e)
+        private void CtxMenuInvertSelection_Click(object? sender, System.EventArgs e)
         {
             if (this.lstDriverStoreEntries.Objects != null)
             {
@@ -924,7 +910,7 @@ namespace Rapr
             }
         }
 
-        private async void CtxMenuDelete_Click(object sender, EventArgs e)
+        private async void CtxMenuDelete_Click(object? sender, EventArgs e)
         {
             if (this.lstDriverStoreEntries.SelectedObjects != null)
             {
@@ -932,7 +918,7 @@ namespace Rapr
             }
         }
 
-        private void CtxMenuSelectOldDrivers_Click(object sender, EventArgs e)
+        private void CtxMenuSelectOldDrivers_Click(object? sender, EventArgs e)
         {
             if (!this.operationInProgress && this.driverStore.SupportDeviceNameColumn && this.lstDriverStoreEntries.Objects != null)
             {
@@ -988,12 +974,12 @@ namespace Rapr
             }
         }
 
-        private void ButtonSelectOldDrivers_Click(object sender, EventArgs e)
+        private void ButtonSelectOldDrivers_Click(object? sender, EventArgs e)
         {
             this.CtxMenuSelectOldDrivers_Click(sender, e);
         }
 
-        private void CtxMenuSelectUnusedDrivers_Click(object sender, EventArgs e)
+        private void CtxMenuSelectUnusedDrivers_Click(object? sender, EventArgs e)
         {
             if (!this.operationInProgress && this.driverStore.SupportDeviceNameColumn && this.lstDriverStoreEntries.Objects != null)
             {
@@ -1018,24 +1004,36 @@ namespace Rapr
                 {
                     this.ShowStatus(
                         Status.Warning,
-                        Language.ResourceManager.GetString("Status_Review_Unused_Drivers", Language.Culture));
+                        LocalizedText("Status_Review_Unused_Drivers"));
                 }
             }
         }
 
-        private void ButtonSelectUnusedDrivers_Click(object sender, EventArgs e)
+        private void ButtonSelectUnusedDrivers_Click(object? sender, EventArgs e)
         {
             this.CtxMenuSelectUnusedDrivers_Click(sender, e);
         }
 
         protected virtual bool ConfirmUnusedDriverSelection()
         {
-            return this.ShowMessageBox(
-                Language.ResourceManager.GetString("Message_Select_Unused_Drivers_Warning", Language.Culture),
+            bool confirmed = Dialogs.Confirm(
+                this,
+                Language.Button_Select_Unused.Replace("&", string.Empty),
+                LocalizedText("Message_Select_Unused_Drivers_Warning"),
                 Language.Message_Title_Warning,
-                MessageBoxButtons.OKCancel,
-                MessageBoxIcon.Warning,
-                MessageBoxDefaultButton.Button2) == DialogResult.OK;
+                Language.Button_OK,
+                details: null,
+                LocalizedText("Dialog_Do_Not_Show_Again"),
+                out bool doNotShowAgain);
+
+            if (confirmed && doNotShowAgain)
+            {
+                Settings.Default.WarnBeforeSelectingUnusedDrivers = false;
+                Settings.Default.Save();
+                this.warnBeforeSelectingUnusedDriversStripMenuItem.Checked = false;
+            }
+
+            return confirmed;
         }
 
         private void ExportDriverList(IEnumerable<DriverStoreEntry> objects)
@@ -1049,18 +1047,14 @@ namespace Rapr
 
             if (driverStoreEntries.Count == 0)
             {
-                this.ShowMessageBox(
-                    Language.Message_No_Entries,
-                    Language.Export_Error,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                Dialogs.ShowMessage(this, Language.Message_No_Entries, Language.Export_Error, TaskDialogIcon.Warning);
 
                 return;
             }
 
             try
             {
-                string fileName = new CsvExporter().Export(driverStoreEntries);
+                string? fileName = new CsvExporter().Export(driverStoreEntries);
 
                 if (!string.IsNullOrEmpty(fileName))
                 {
@@ -1074,12 +1068,12 @@ namespace Rapr
             }
         }
 
-        private void ExitToolStripMenuItem_Click(object sender, EventArgs e)
+        private void ExitToolStripMenuItem_Click(object? sender, EventArgs e)
         {
             Application.Exit();
         }
 
-        private void SwitchCulture(object sender, EventArgs e)
+        private void SwitchCulture(object? sender, EventArgs e)
         {
             if ((sender as ToolStripMenuItem)?.Tag is CultureInfo ci)
             {
@@ -1100,6 +1094,7 @@ namespace Rapr
                 this.InitializeComponent();
                 this.BuildLanguageMenu();
                 this.SetupOptionsMenu();
+                this.SetupToolbar();
                 this.RightToLeft = ci.TextInfo.IsRightToLeft ? RightToLeft.Yes : RightToLeft.No;
                 this.RightToLeftLayout = ci.TextInfo.IsRightToLeft;
                 this.SetupListViewColumns();
@@ -1123,7 +1118,7 @@ namespace Rapr
             }
         }
 
-        private void ViewLogsToolStripMenuItem_Click(object sender, EventArgs e)
+        private void ViewLogsToolStripMenuItem_Click(object? sender, EventArgs e)
         {
             if (!string.IsNullOrEmpty(TextFileTraceListener.LastTraceFile))
             {
@@ -1139,32 +1134,32 @@ namespace Rapr
                     }
                     catch (Win32Exception ex)
                     {
-                        this.ShowMessageBox(ex.Message, Language.Message_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        Dialogs.ShowMessage(this, ex.Message, Language.Message_Error, TaskDialogIcon.Error, ex.ToString());
                     }
                 }
             }
             else
             {
-                this.ShowMessageBox(Language.Message_Log_File_NotFound, Language.Message_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Dialogs.ShowMessage(this, Language.Message_Log_File_NotFound, Language.Message_Error, TaskDialogIcon.Error);
             }
         }
 
-        private void ExportSelectedDriverListToolStripMenuItem_Click(object sender, EventArgs e)
+        private void ExportSelectedDriverListToolStripMenuItem_Click(object? sender, EventArgs e)
         {
             ExportDriverList(this.lstDriverStoreEntries.CheckedObjects);
         }
 
-        private void ExportAllDriverListToolStripMenuItem_Click(object sender, EventArgs e)
+        private void ExportAllDriverListToolStripMenuItem_Click(object? sender, EventArgs e)
         {
             ExportDriverList(this.lstDriverStoreEntries.Objects);
         }
 
-        private void RunAsAdminToolStripMenuItem_Click(object sender, EventArgs e)
+        private void RunAsAdminToolStripMenuItem_Click(object? sender, EventArgs e)
         {
             DSEFormHelper.RunAsAdministrator();
         }
 
-        private void AboutToolStripMenuItem_Click(object sender, EventArgs e)
+        private void AboutToolStripMenuItem_Click(object? sender, EventArgs e)
         {
             using (AboutBox ab = new AboutBox(UpdateManager))
             {
@@ -1174,7 +1169,7 @@ namespace Rapr
             }
         }
 
-        private void DSEForm_Load(object sender, EventArgs e)
+        private void DSEForm_Load(object? sender, EventArgs e)
         {
             try
             {
@@ -1204,7 +1199,7 @@ namespace Rapr
             }
         }
 
-        private void DSEForm_FormClosing(object sender, FormClosingEventArgs e)
+        private void DSEForm_FormClosing(object? sender, FormClosingEventArgs e)
         {
             Settings.Default.DriverStoreViewState = Convert.ToBase64String(this.lstDriverStoreEntries.SaveState());
 
@@ -1232,7 +1227,7 @@ namespace Rapr
             Settings.Default.Save();
         }
 
-        private void LstDriverStoreEntries_ItemChecked(object sender, ItemCheckedEventArgs e)
+        private void LstDriverStoreEntries_ItemChecked(object? sender, ItemCheckedEventArgs e)
         {
             if (!this.operationInProgress)
             {
@@ -1286,14 +1281,30 @@ namespace Rapr
 
         private void UpdateColumnSize()
         {
-            // Make the column size fit both header and content.
-            for (var i = 0; i < this.lstDriverStoreEntries.Columns.Count - 1; i++)
+            var list = this.lstDriverStoreEntries;
+
+            // The header also draws the sort arrow, plus the sort priority when sorting by two
+            // columns, which the automatic width doesn't count ("Driver Date" became "Drive...").
+            // ObjectListView draws the arrow 16 pixels wide.
+            int sortIndicatorWidth = 16 + this.LogicalToDeviceUnits(4);
+            if (list.SortDescriptions.Count > 1)
             {
-                this.lstDriverStoreEntries.Columns[i].Width = -2;
+                sortIndicatorWidth += TextRenderer.MeasureText("9", list.Font).Width;
+            }
+
+            // Make the column size fit both header and content.
+            for (var i = 0; i < list.Columns.Count - 1; i++)
+            {
+                list.Columns[i].Width = -2;
+
+                if (list.ShowSortIndicators && list.Columns[i] is OLVColumn column && list.GetSortPriority(column) > 0)
+                {
+                    column.Width += sortIndicatorWidth;
+                }
             }
         }
 
-        private void CtxMenuOpenDeviceProperties_Click(object sender, EventArgs e)
+        private void CtxMenuOpenDeviceProperties_Click(object? sender, EventArgs e)
         {
             if (this.lstDriverStoreEntries.SelectedObject != null)
             {
@@ -1302,7 +1313,7 @@ namespace Rapr
             }
         }
 
-        private void CtxMenuOpenFolder_Click(object sender, EventArgs e)
+        private void CtxMenuOpenFolder_Click(object? sender, EventArgs e)
         {
             if (this.lstDriverStoreEntries.SelectedObject != null)
             {
@@ -1312,11 +1323,11 @@ namespace Rapr
                     return;
                 }
 
-                Process.Start("explorer.exe", "/select, " + Path.Combine(item.DriverFolderLocation, item.DriverInfName));
+                Process.Start("explorer.exe", "/select, " + item.InfFullPath);
             }
         }
 
-        private void CtxMenuCopyFolderPath_Click(object sender, EventArgs e)
+        private void CtxMenuCopyFolderPath_Click(object? sender, EventArgs e)
         {
             if (this.lstDriverStoreEntries.SelectedObject != null)
             {
@@ -1330,7 +1341,7 @@ namespace Rapr
             }
         }
 
-        private async void ChooseDriverStoreToolStripMenuItem_Click(object sender, EventArgs e)
+        private async void ChooseDriverStoreToolStripMenuItem_Click(object? sender, EventArgs e)
         {
             using (ChooseDriverStore chooseDriverStore = new ChooseDriverStore())
             {
@@ -1353,7 +1364,7 @@ namespace Rapr
                             this.UpdateDriverStore(DriverStoreFactory.CreateOnlineDriverStore());
                             break;
 
-                        case DriverStoreType.Offline:
+                        case DriverStoreType.Offline when !string.IsNullOrEmpty(chooseDriverStore.OfflineStoreLocation):
                             this.UpdateDriverStore(DriverStoreFactory.CreateOfflineDriverStore(chooseDriverStore.OfflineStoreLocation));
                             break;
                     }
@@ -1363,7 +1374,7 @@ namespace Rapr
             }
         }
 
-        private void LstDriverStoreEntries_FormatCell(object sender, BrightIdeasSoftware.FormatCellEventArgs e)
+        private void LstDriverStoreEntries_FormatCell(object? sender, BrightIdeasSoftware.FormatCellEventArgs e)
         {
             DriverStoreEntry entry = (DriverStoreEntry)e.Model;
 
@@ -1383,11 +1394,14 @@ namespace Rapr
             }
         }
 
-        private void LstDriverStoreEntries_FormatRow(object sender, BrightIdeasSoftware.FormatRowEventArgs e)
+        private void LstDriverStoreEntries_FormatRow(object? sender, BrightIdeasSoftware.FormatRowEventArgs e)
         {
             if (e.Item.Checked)
             {
-                e.Item.BackColor = Color.FromArgb(unchecked((int)0xFFCBE8F6));
+                // Light blue, or a dark blue that keeps the light text readable in dark mode.
+                e.Item.BackColor = MyObjectListView.IsDarkMode
+                    ? Color.FromArgb(0x26, 0x4F, 0x78)
+                    : Color.FromArgb(unchecked((int)0xFFCBE8F6));
             }
         }
 
@@ -1438,14 +1452,14 @@ namespace Rapr
             Normal,
         }
 
-        private void ShowStatus(Status status, string text, string detail = null, bool usePopup = false)
+        private void ShowStatus(Status status, string text, string? detail = null, bool usePopup = false)
         {
             this.lblStatus.Text = text.Replace("\r\n", "\n").Replace("\n", " ");
             bool requiresReview = this.lstDriverStoreEntries.CheckedObjects?
                 .Any(this.unusedDriversToReview.Contains) == true;
             if (requiresReview)
             {
-                string reminder = Language.ResourceManager.GetString("Status_Review_Unused_Drivers", Language.Culture);
+                string reminder = LocalizedText("Status_Review_Unused_Drivers");
                 if (!this.lblStatus.Text.Contains(reminder))
                 {
                     this.lblStatus.Text += " " + reminder;
@@ -1463,7 +1477,7 @@ namespace Rapr
 
                     if (usePopup)
                     {
-                        this.ShowMessageBox(text, Language.Message_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        Dialogs.ShowMessage(this, text, Language.Message_Error, TaskDialogIcon.Error, detail);
                     }
 
                     break;
@@ -1475,7 +1489,7 @@ namespace Rapr
 
                     if (usePopup)
                     {
-                        this.ShowMessageBox(text, Language.Product_Name, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        Dialogs.ShowMessage(this, text, Language.Product_Name, TaskDialogIcon.Information, detail);
                     }
 
                     break;
@@ -1487,7 +1501,7 @@ namespace Rapr
 
                     if (usePopup)
                     {
-                        this.ShowMessageBox(text, Language.Message_Title_Warning, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        Dialogs.ShowMessage(this, text, Language.Message_Title_Warning, TaskDialogIcon.Warning, detail);
                     }
 
                     break;
@@ -1499,7 +1513,7 @@ namespace Rapr
 
                     if (usePopup)
                     {
-                        this.ShowMessageBox(text, Language.Product_Name, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        Dialogs.ShowMessage(this, text, Language.Product_Name, TaskDialogIcon.Information, detail);
                     }
 
                     break;
@@ -1513,9 +1527,9 @@ namespace Rapr
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "<Pending>")]
-        private async void ButtonExportAllDrivers_Click(object sender, EventArgs e)
+        private async void ButtonExportAllDrivers_Click(object? sender, EventArgs e)
         {
-            string destinationPath = FolderPicker.Pick(this, FolderPicker.ExportDrivers);
+            string? destinationPath = FolderPicker.Pick(this, FolderPicker.ExportDrivers);
             if (destinationPath == null)
             {
                 return;
@@ -1548,61 +1562,45 @@ namespace Rapr
             }
         }
 
-        private DialogResult ShowMessageBox(
-            string text,
-            string caption,
-            MessageBoxButtons buttons,
-            MessageBoxIcon icon,
-            MessageBoxDefaultButton defaultButton = MessageBoxDefaultButton.Button1)
-        {
-            return FlexibleMessageBox.Show(
-                this,
-                text,
-                caption,
-                buttons,
-                icon,
-                defaultButton);
-        }
-
-        private async void UseNativeDriveStoreStripMenuItem_Click(object sender, System.EventArgs e)
+        private async void UseNativeDriveStoreStripMenuItem_Click(object? sender, System.EventArgs e)
         {
             await this.UpdateDriverStoreAPI(DriverStoreOption.Native);
         }
 
-        private async void UseDismStripMenuItem_Click(object sender, System.EventArgs e)
+        private async void UseDismStripMenuItem_Click(object? sender, System.EventArgs e)
         {
             await this.UpdateDriverStoreAPI(DriverStoreOption.DISM);
         }
 
-        private async void UsePnpUtilStripMenuItem_Click(object sender, System.EventArgs e)
+        private async void UsePnpUtilStripMenuItem_Click(object? sender, System.EventArgs e)
         {
             await this.UpdateDriverStoreAPI(DriverStoreOption.PnpUtil);
         }
 
-        private void IncludeBootCriticalDriversStripMenuItem_Click(object sender, System.EventArgs e)
+        private void IncludeBootCriticalDriversStripMenuItem_Click(object? sender, System.EventArgs e)
         {
             Settings.Default.IncludeBootCriticalInOldDriverSelection = this.includeBootCriticalDriversStripMenuItem.Checked;
             Settings.Default.Save();
         }
 
-        private void WarnBeforeSelectingUnusedDriversStripMenuItem_Click(object sender, System.EventArgs e)
+        private void WarnBeforeSelectingUnusedDriversStripMenuItem_Click(object? sender, System.EventArgs e)
         {
             Settings.Default.WarnBeforeSelectingUnusedDrivers = this.warnBeforeSelectingUnusedDriversStripMenuItem.Checked;
             Settings.Default.Save();
         }
 
-        private async void CtxMenuExportDriver_Click(object sender, System.EventArgs e)
+        private async void CtxMenuExportDriver_Click(object? sender, System.EventArgs e)
         {
-            string destinationPath = FolderPicker.Pick(this, FolderPicker.ExportDrivers);
+            string? destinationPath = FolderPicker.Pick(this, FolderPicker.ExportDrivers);
             if (destinationPath != null)
             {
                 await ExportDrivers(this.lstDriverStoreEntries.SelectedObjects, destinationPath);
             }
         }
 
-        private async void ButtonExportDrivers_Click(object sender, System.EventArgs e)
+        private async void ButtonExportDrivers_Click(object? sender, System.EventArgs e)
         {
-            string destinationPath = FolderPicker.Pick(this, FolderPicker.ExportDrivers);
+            string? destinationPath = FolderPicker.Pick(this, FolderPicker.ExportDrivers);
             if (destinationPath != null)
             {
                 await ExportDrivers(this.lstDriverStoreEntries.CheckedObjects, destinationPath);
@@ -1684,7 +1682,7 @@ namespace Rapr
             }
         }
 
-        private void TextBoxSearch_TextChanged(object sender, EventArgs e)
+        private void TextBoxSearch_TextChanged(object? sender, EventArgs e)
         {
             // Reset the debounce timer
             this.searchDebounceTimer?.Stop();
@@ -1720,7 +1718,7 @@ namespace Rapr
                     }
 
                     // Helper function to check if a string contains the search text
-                    bool Contains(string value) => value?.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0;
+                    bool Contains(string? value) => value?.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0;
 
                     return Contains(entry.DriverPublishedName) ||
                            Contains(entry.DriverInfName) ||

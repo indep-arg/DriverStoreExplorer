@@ -7,11 +7,11 @@ namespace Rapr.Utils
 {
     public class DriverStoreContent
     {
-        public string InfName { get; set; }
+        public required string InfName { get; set; }
 
-        public string FolderPath { get; set; }
+        public required string FolderPath { get; set; }
 
-        public string Content { get; set; }
+        public required string Content { get; set; }
 
         public long EstimateSize { get; set; }
     }
@@ -44,11 +44,11 @@ namespace Rapr.Utils
             {
                 if (!string.IsNullOrEmpty(infName))
                 {
-                    string content = GetSystemRootInfContent(infName);
+                    string? content = GetSystemRootInfContent(infName);
 
                     if (!string.IsNullOrEmpty(content))
                     {
-                        DriverStoreContent driverStoreContent = this.FindInfInfo(content);
+                        DriverStoreContent? driverStoreContent = this.FindInfInfo(content);
 
                         if (driverStoreContent != null)
                         {
@@ -65,7 +65,7 @@ namespace Rapr.Utils
             }
         }
 
-        private DriverStoreContent FindInfInfo(string content)
+        private DriverStoreContent? FindInfInfo(string content)
         {
             for (int i = 0; i < this.driverStoreContents.Count; i++)
             {
@@ -121,9 +121,9 @@ namespace Rapr.Utils
             return null;
         }
 
-        private static string GetSystemRootInfContent(string infName)
+        private static string? GetSystemRootInfContent(string infName)
         {
-            string content = null;
+            string? content = null;
             string filePath = Path.Combine(SystemRootInf, infName);
             if (File.Exists(filePath))
             {

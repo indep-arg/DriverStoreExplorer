@@ -13,7 +13,7 @@ namespace Rapr
     {
         private const string UpdateLinkData = "update";
         private readonly IUpdateManager updateManager;
-        private VersionInfo latestVersionInfo;
+        private VersionInfo? latestVersionInfo;
 
         public AboutBox(IUpdateManager updateManager)
         {
@@ -90,7 +90,7 @@ namespace Rapr
                     }
                 }
 
-                return Assembly.GetExecutingAssembly().GetName().Name;
+                return Assembly.GetExecutingAssembly().GetName().Name ?? Language.Product_Name;
             }
         }
 
@@ -98,7 +98,7 @@ namespace Rapr
         {
             get
             {
-                return Assembly.GetExecutingAssembly().GetName().Version;
+                return Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0);
             }
         }
 
@@ -155,36 +155,42 @@ namespace Rapr
         }
         #endregion
 
-        private async void LabelLink_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        private async void LabelLink_LinkClicked(object? sender, LinkLabelLinkClickedEventArgs e)
         {
-            if (e.Link.LinkData?.ToString() == UpdateLinkData && this.latestVersionInfo != null)
+            if (e.Link?.LinkData?.ToString() == UpdateLinkData && this.latestVersionInfo != null)
             {
                 await this.PerformUpdateAsync();
                 return;
             }
 
-            string url;
-            LinkLabel linkLabel = (LinkLabel)sender;
-
-            if (e.Link.LinkData != null)
+            if (!(sender is LinkLabel linkLabel) || e.Link == null)
             {
-                url = e.Link.LinkData.ToString();
-            }
-            else
-            {
-                url = linkLabel.Text.Substring(e.Link.Start, e.Link.Length);
+                return;
             }
 
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-            linkLabel.LinkVisited = true;
+            string? url = e.Link.LinkData != null
+                ? e.Link.LinkData.ToString()
+                : linkLabel.Text.Substring(e.Link.Start, e.Link.Length);
+
+            if (!string.IsNullOrEmpty(url))
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                linkLabel.LinkVisited = true;
+            }
         }
 
         private async Task PerformUpdateAsync()
         {
             try
             {
+                VersionInfo? versionInfo = this.latestVersionInfo;
+                if (versionInfo == null)
+                {
+                    return;
+                }
+
                 this.labelLink.Links.Clear();
-                string versionStr = this.latestVersionInfo.Version.ToString();
+                string versionStr = versionInfo.Version.ToString();
                 this.labelLink.Text = string.Format(Language.Update_Downloading, versionStr, 0);
 
                 var progress = new Progress<float>(p =>
@@ -194,7 +200,7 @@ namespace Rapr
 
                 string exePath = Application.ExecutablePath;
 
-                await this.updateManager.ApplyUpdateAsync(this.latestVersionInfo, progress);
+                await this.updateManager.ApplyUpdateAsync(versionInfo, progress);
 
                 if (!this.updateManager.HandlesRestart)
                 {
@@ -209,11 +215,12 @@ namespace Rapr
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    string.Format(Language.Update_Failed, ex.Message),
+                Dialogs.ShowMessage(
+                    this,
+                    string.Format(Language.Update_Failed, ex.Message).Trim('(', ')'),
                     Language.Product_Name,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                    TaskDialogIcon.Error,
+                    ex.ToString());
 
                 // Reset the link
                 this.latestVersionInfo = null;
@@ -221,9 +228,12 @@ namespace Rapr
             }
         }
 
-        private void TextBoxDescription_LinkClicked(object sender, LinkClickedEventArgs e)
+        private void TextBoxDescription_LinkClicked(object? sender, LinkClickedEventArgs e)
         {
-            Process.Start(new ProcessStartInfo(e.LinkText) { UseShellExecute = true });
+            if (!string.IsNullOrEmpty(e.LinkText))
+            {
+                Process.Start(new ProcessStartInfo(e.LinkText) { UseShellExecute = true });
+            }
         }
     }
 }

@@ -14,7 +14,7 @@ namespace Rapr
         internal static readonly Guid OfflineStore = new Guid("6f0b8f34-5c1e-4d2a-9a43-2f7d0b6e1a03");
 
         /// <returns>The selected folder, or null if the user cancelled.</returns>
-        internal static string Pick(IWin32Window owner, Guid purpose, string title = null)
+        internal static string? Pick(IWin32Window owner, Guid purpose, string? title = null)
         {
             using (var dialog = new FolderBrowserDialog
             {

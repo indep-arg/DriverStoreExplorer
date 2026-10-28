@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
 using System.Windows.Forms;
 using Rapr.Properties;
@@ -73,7 +74,7 @@ namespace Rapr.Controls
             }
         }
 
-        private void EnhancedSearchTextBox_Resize(object sender, EventArgs e)
+        private void EnhancedSearchTextBox_Resize(object? sender, EventArgs e)
         {
             if (this.textBox == null || this.placeholderLabel == null || this.clearButton == null)
             {
@@ -117,7 +118,7 @@ namespace Rapr.Controls
             this.clearButton.Location = new Point(clearButtonX, iconY);
         }
 
-        private void TextBox_Enter(object sender, EventArgs e)
+        private void TextBox_Enter(object? sender, EventArgs e)
         {
             // Hide placeholder when textbox gets focus
             if (this.placeholderLabel != null)
@@ -126,13 +127,13 @@ namespace Rapr.Controls
             }
         }
 
-        private void TextBox_Leave(object sender, EventArgs e)
+        private void TextBox_Leave(object? sender, EventArgs e)
         {
             // Show placeholder if textbox is empty when it loses focus
             this.UpdatePlaceholderVisibility();
         }
 
-        private void TextBox_TextChanged(object sender, EventArgs e)
+        private void TextBox_TextChanged(object? sender, EventArgs e)
         {
             if (this.textBox == null || this.clearButton == null)
             {
@@ -149,7 +150,7 @@ namespace Rapr.Controls
             this.OnTextChanged(EventArgs.Empty);
         }
 
-        private void TextBox_KeyDown(object sender, KeyEventArgs e)
+        private void TextBox_KeyDown(object? sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Escape)
             {
@@ -157,7 +158,7 @@ namespace Rapr.Controls
             }
         }
 
-        private void PlaceholderLabel_Click(object sender, EventArgs e)
+        private void PlaceholderLabel_Click(object? sender, EventArgs e)
         {
             // When placeholder is clicked, hide it and focus the textbox
             if (this.textBox != null)
@@ -167,7 +168,7 @@ namespace Rapr.Controls
             }
         }
 
-        private void PlaceholderLabel_MouseDown(object sender, MouseEventArgs e)
+        private void PlaceholderLabel_MouseDown(object? sender, MouseEventArgs e)
         {
             // When placeholder is clicked, hide it and focus the textbox
             if (this.textBox != null)
@@ -177,12 +178,12 @@ namespace Rapr.Controls
             }
         }
 
-        private void ClearButton_Click(object sender, EventArgs e)
+        private void ClearButton_Click(object? sender, EventArgs e)
         {
             this.ClearText();
         }
 
-        private void ClearButton_MouseEnter(object sender, EventArgs e)
+        private void ClearButton_MouseEnter(object? sender, EventArgs e)
         {
             if (this.DesignMode || this.clearButton == null)
             {
@@ -208,7 +209,7 @@ namespace Rapr.Controls
             oldImg?.Dispose();
         }
 
-        private void ClearButton_MouseLeave(object sender, EventArgs e)
+        private void ClearButton_MouseLeave(object? sender, EventArgs e)
         {
             if (this.DesignMode || this.clearButton == null)
             {
@@ -223,7 +224,7 @@ namespace Rapr.Controls
         /// <summary>
         /// Gets the clear button icon
         /// </summary>
-        private Image GetClearButtonIcon()
+        private Image? GetClearButtonIcon()
         {
             if (this.DesignMode) return null;
 
@@ -272,7 +273,7 @@ namespace Rapr.Controls
             this.textBox.Focus();
         }
 
-        private void EnhancedSearchTextBox_Paint(object sender, PaintEventArgs e)
+        private void EnhancedSearchTextBox_Paint(object? sender, PaintEventArgs e)
         {
             float penWidth = Math.Max(1f, this.ScaleFactor);
             using (var pen = new Pen(Color.Gray, penWidth))
@@ -284,6 +285,7 @@ namespace Rapr.Controls
 
         // Public properties and events to mimic TextBox behavior
         [Browsable(false)]
+        [AllowNull]
         public override string Text
         {
             get
@@ -318,7 +320,7 @@ namespace Rapr.Controls
             }
         }
 
-        public new event EventHandler TextChanged;
+        public new event EventHandler? TextChanged;
 
         protected override void OnTextChanged(EventArgs e)
         {

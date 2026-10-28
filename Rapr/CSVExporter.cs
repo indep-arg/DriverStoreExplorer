@@ -18,7 +18,7 @@ namespace Rapr
         // device names come from third-party INF files, so they shouldn't be able to become one.
         private static readonly char[] FormulaPrefixes = { '=', '+', '-', '@', '\t', '\r' };
 
-        public string Export(List<DriverStoreEntry> driverStoreEntries)
+        public string? Export(List<DriverStoreEntry> driverStoreEntries)
         {
             if (driverStoreEntries == null)
             {

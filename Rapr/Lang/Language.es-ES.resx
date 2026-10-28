@@ -560,4 +560,10 @@ Borrarlos puede hacer que los programas o dispositivos dejen de funcionar. Revis
   <data name="Message_Theme_Restart" xml:space="preserve">
     <value>El nuevo tema se aplicará la próxima vez que se abra Driver Store Explorer.</value>
   </data>
+  <data name="Dialog_Restart_Now" xml:space="preserve">
+    <value>Reiniciar ahora</value>
+  </data>
+  <data name="Dialog_Do_Not_Show_Again" xml:space="preserve">
+    <value>No volver a mostrar este aviso</value>
+  </data>
 </root>

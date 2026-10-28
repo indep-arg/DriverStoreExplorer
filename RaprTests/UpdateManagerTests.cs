@@ -106,6 +106,18 @@ namespace Rapr.Tests
         }
 
         [TestMethod]
+        public void ReleaseWhoseTagIsNotAVersionHasNoUpdate()
+        {
+            const string Json = @"{
+                ""tag_name"": ""v1.1.0-beta"",
+                ""html_url"": ""https://github.com/lostindark/DriverStoreExplorer/releases/tag/v1.1.0-beta"",
+                ""assets"": [ { ""name"": ""DriverStoreExplorer-v1.1.0-beta.zip"", ""browser_download_url"": ""https://github.com/lostindark/DriverStoreExplorer/releases/download/v1.1.0-beta/DriverStoreExplorer-v1.1.0-beta.zip"" } ]
+            }";
+
+            Assert.IsNull(ParseLatestRelease(Json));
+        }
+
+        [TestMethod]
         public void SameNameLibraryCannotReplaceTheExecutable()
         {
             string currentExePath = Path.Combine(this.appDirectory, "Rapr.exe");

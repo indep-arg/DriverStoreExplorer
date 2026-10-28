@@ -12,8 +12,6 @@ using System.Windows.Forms;
 
 using BrightIdeasSoftware;
 
-using JR.Utils.GUI.Forms;
-
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using Rapr.Lang;
@@ -142,46 +140,6 @@ namespace Rapr.Tests
                 Assert.AreEqual(Language.Status_No_Drivers_Selected, status.Text);
                 Assert.AreNotEqual(Color.Yellow, status.BackColor);
             });
-        }
-
-        [TestMethod]
-        [DataRow(MessageBoxButtons.OKCancel, MessageBoxDefaultButton.Button1, DialogResult.OK)]
-        [DataRow(MessageBoxButtons.OKCancel, MessageBoxDefaultButton.Button2, DialogResult.Cancel)]
-        [DataRow(MessageBoxButtons.OKCancel, MessageBoxDefaultButton.Button3, DialogResult.Cancel)]
-        [DataRow(MessageBoxButtons.OK, MessageBoxDefaultButton.Button1, DialogResult.OK)]
-        [DataRow(MessageBoxButtons.YesNoCancel, MessageBoxDefaultButton.Button2, DialogResult.No)]
-        public void MessageBoxDefaultFocusMatchesTheVisibleButton(
-            MessageBoxButtons buttons,
-            MessageBoxDefaultButton defaultButton,
-            DialogResult expected)
-        {
-            var dialogType = typeof(FlexibleMessageBox).GetNestedType("FlexibleMessageBoxForm", BindingFlags.NonPublic);
-            using (var dialog = (Form)Activator.CreateInstance(dialogType, true))
-            using (var timer = new Timer { Interval = 1 })
-            {
-                var bindingSource = (BindingSource)dialogType
-                    .GetField("FlexibleMessageBoxFormBindingSource", BindingFlags.Instance | BindingFlags.NonPublic)
-                    .GetValue(dialog);
-                bindingSource.DataSource = dialog;
-                dialogType.GetMethod("SetDialogButtons", BindingFlags.Static | BindingFlags.NonPublic)
-                    .Invoke(null, new object[] { dialog, buttons, defaultButton });
-                DialogResult focusedResult = DialogResult.None;
-                timer.Tick += (sender, args) =>
-                {
-                    timer.Stop();
-                    if (dialog.ActiveControl is Button button && button.Focused)
-                    {
-                        focusedResult = button.DialogResult;
-                    }
-
-                    dialog.Close();
-                };
-
-                timer.Start();
-                dialog.ShowDialog();
-
-                Assert.AreEqual(expected, focusedResult);
-            }
         }
 
         [TestMethod]
@@ -417,6 +375,24 @@ namespace Rapr.Tests
                 Invoke(form, "CtxMenuInvertSelection_Click", null, EventArgs.Empty);
                 CollectionAssert.AreEquivalent(new[] { third }, list.CheckedObjects.ToArray());
             });
+        }
+
+        [TestMethod]
+        public void CheckBoxesCanBeTurnedOnAfterTheListHasAWindow()
+        {
+            // Like the main form: the list's window already exists when checkboxes are turned on,
+            // and attaching the state image list makes the native list view recreate itself.
+            using (var list = new MyObjectListView { UseCompatibleStateImageBehavior = false })
+            {
+                Assert.AreNotEqual(IntPtr.Zero, list.Handle);
+
+                list.CheckBoxes = true;
+
+                Assert.AreEqual(2, list.StateImageList.Images.Count);
+                list.SetObjects(new[] { CreateDriver("first.inf", 1) });
+                list.CheckedObjects = list.Objects.Cast<DriverStoreEntry>().ToList();
+                Assert.HasCount(1, list.CheckedObjects);
+            }
         }
 
         [TestMethod]

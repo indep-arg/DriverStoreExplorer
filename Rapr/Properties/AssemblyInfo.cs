@@ -38,3 +38,7 @@ using System.Runtime.InteropServices;
 [assembly: NeutralResourcesLanguage("en")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatform("windows6.1")]
 
+// Every P/Invoke in this app targets a Windows DLL. Load them only from System32, so a DLL with
+// the same name next to the exe (in Downloads, say) is never loaded into this elevated process.
+[assembly: DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+
