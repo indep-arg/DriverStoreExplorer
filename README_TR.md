@@ -94,7 +94,6 @@ rapr
 ## Katkıda Bulunanlar
 - [ObjectListView](http://objectlistview.sourceforge.net/)
 - [Managed DismApi Wrapper](https://github.com/jeffkl/ManagedDism)
-- [FlexibleMessageBox](https://www.codeproject.com/Articles/601900/FlexibleMessageBox-A-Flexible-Replacement-for-the)
 - [Resource Embedder](https://github.com/0xced/resource-embedder)
 - [PortableSettingsProvider](https://github.com/bluegrams/SettingsProviders)
 - [Strong Namer](https://github.com/dsplaisted/strongnamer)

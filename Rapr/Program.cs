@@ -157,7 +157,7 @@ namespace Rapr
                     Trace.TraceWarning($"Portable settings could not be initialized; retaining per-user settings: {ex}");
                     if (!(ex is SecurityException) && !(ex is UnauthorizedAccessException) && !(ex is IOException))
                     {
-                        MessageBox.Show(ex.Message, Language.Product_Name, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        Dialogs.ShowMessage(null, ex.Message, Language.Product_Name, TaskDialogIcon.Error, ex.ToString());
                     }
                 }
 
@@ -211,7 +211,7 @@ namespace Rapr
                         return;
                     }
 
-                    MessageBox.Show(Language.Message_Requires_Admin, Language.Product_Name, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Dialogs.ShowMessage(null, Language.Message_Requires_Admin, Language.Product_Name, TaskDialogIcon.Error);
                     return;
                 }
 
@@ -226,11 +226,7 @@ namespace Rapr
             catch (ConfigurationException e)
             {
                 Trace.TraceError(e.ToString());
-                MessageBox.Show(
-                    e.Message,
-                    Language.Product_Name,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                Dialogs.ShowMessage(null, e.Message, Language.Product_Name, TaskDialogIcon.Error, e.ToString());
             }
         }
     }

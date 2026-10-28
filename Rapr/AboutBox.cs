@@ -215,11 +215,12 @@ namespace Rapr
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    string.Format(Language.Update_Failed, ex.Message),
+                Dialogs.ShowMessage(
+                    this,
+                    string.Format(Language.Update_Failed, ex.Message).Trim('(', ')'),
                     Language.Product_Name,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                    TaskDialogIcon.Error,
+                    ex.ToString());
 
                 // Reset the link
                 this.latestVersionInfo = null;

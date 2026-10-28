@@ -107,12 +107,11 @@ namespace Rapr
             // Validate that the selected directory contains a Windows folder
             if (!IsValidOfflineStoreLocation(selectedPath))
             {
-                MessageBox.Show(
+                Dialogs.ShowMessage(
                     this,
                     Lang.Language.Message_Invalid_Offline_Store_Location,
                     Lang.Language.Message_Invalid_Offline_Store_Title,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                    TaskDialogIcon.Warning);
                 return;
             }
 

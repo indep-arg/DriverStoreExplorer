@@ -15,8 +15,6 @@ using System.Windows.Forms;
 
 using BrightIdeasSoftware;
 
-using JR.Utils.GUI.Forms;
-
 using Rapr.Lang;
 using Rapr.Properties;
 using Rapr.Utils;
@@ -375,12 +373,27 @@ namespace Rapr
             Settings.Default.ColorMode = colorMode;
             Settings.Default.Save();
 
-            MessageBox.Show(
-                this,
-                LocalizedText("Message_Theme_Restart"),
-                Language.Product_Name,
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
+            var restartNow = new TaskDialogButton(LocalizedText("Dialog_Restart_Now"));
+            var page = new TaskDialogPage
+            {
+                Caption = Language.Product_Name,
+                Text = LocalizedText("Message_Theme_Restart"),
+                Icon = TaskDialogIcon.Information,
+                Buttons = { TaskDialogButton.Close },
+                DefaultButton = TaskDialogButton.Close,
+            };
+
+            // Don't offer it in the middle of a delete or export. Otherwise only the list is lost,
+            // and it is read again on start.
+            if (!this.operationInProgress)
+            {
+                page.Buttons.Insert(0, restartNow);
+            }
+
+            if (TaskDialog.ShowDialog(this, page, TaskDialogStartupLocation.CenterOwner) == restartNow)
+            {
+                Application.Restart();
+            }
         }
 
         private void EnsureOnScreen()
@@ -464,7 +477,6 @@ namespace Rapr
 
         private async Task DeleteDriverStoreEntries(IEnumerable<DriverStoreEntry> entries)
         {
-            StringBuilder msgWarning = new StringBuilder();
             var driverStoreEntries = entries
                 .OrderByColumnName(this.lstDriverStoreEntries.PrimarySortColumn?.AspectName, this.lstDriverStoreEntries.PrimarySortOrder == SortOrder.Ascending)
                 .ThenByColumnName(this.lstDriverStoreEntries.SecondarySortColumn?.AspectName, this.lstDriverStoreEntries.SecondarySortOrder == SortOrder.Ascending)
@@ -472,34 +484,36 @@ namespace Rapr
 
             if (driverStoreEntries?.Count > 0)
             {
+                string heading;
+                string? packageList = null;
+
                 if (driverStoreEntries.Count == 1)
                 {
-                    msgWarning.AppendFormat(
+                    heading = string.Format(
                         this.cbForceDeletion.Checked ? Language.Message_ForceDelete_Single_Package : Language.Message_Delete_Single_Package,
                         driverStoreEntries[0].DriverInfName,
                         $"{driverStoreEntries[0].DriverVersion}, {DriverStoreEntry.GetBytesReadable(driverStoreEntries[0].DriverSize)}");
                 }
                 else
                 {
-                    msgWarning.AppendFormat(
+                    heading = string.Format(
                         this.cbForceDeletion.Checked ? Language.Message_ForceDelete_Multiple_Packages : Language.Message_Delete_Multiple_Packages,
                         driverStoreEntries.Count);
 
-                    msgWarning.AppendLine();
-
-                    foreach (DriverStoreEntry item in driverStoreEntries)
-                    {
-                        msgWarning.AppendLine($"{item.DriverInfName} - {item.DriverVersion} - {DriverStoreEntry.GetBytesReadable(item.DriverSize)}");
-                    }
+                    packageList = string.Join(
+                        Environment.NewLine,
+                        driverStoreEntries.Select(item => $"{item.DriverInfName} - {item.DriverVersion} - {DriverStoreEntry.GetBytesReadable(item.DriverSize)}"));
                 }
 
-                msgWarning.AppendLine().Append(Language.Message_Sure);
-
-                if (DialogResult.OK == this.ShowMessageBox(
-                    msgWarning.ToString(),
+                if (Dialogs.Confirm(
+                    this,
+                    heading,
+                    Language.Message_Sure,
                     Language.Message_Title_Warning,
-                    MessageBoxButtons.OKCancel,
-                    MessageBoxIcon.Warning))
+                    Language.Context_Delete,
+                    packageList,
+                    verificationText: null,
+                    out _))
                 {
                     await this.DeleteDriverStorePackages(driverStoreEntries).ConfigureAwait(true);
                 }
@@ -1002,12 +1016,24 @@ namespace Rapr
 
         protected virtual bool ConfirmUnusedDriverSelection()
         {
-            return this.ShowMessageBox(
+            bool confirmed = Dialogs.Confirm(
+                this,
+                Language.Button_Select_Unused.Replace("&", string.Empty),
                 LocalizedText("Message_Select_Unused_Drivers_Warning"),
                 Language.Message_Title_Warning,
-                MessageBoxButtons.OKCancel,
-                MessageBoxIcon.Warning,
-                MessageBoxDefaultButton.Button2) == DialogResult.OK;
+                Language.Button_OK,
+                details: null,
+                LocalizedText("Dialog_Do_Not_Show_Again"),
+                out bool doNotShowAgain);
+
+            if (confirmed && doNotShowAgain)
+            {
+                Settings.Default.WarnBeforeSelectingUnusedDrivers = false;
+                Settings.Default.Save();
+                this.warnBeforeSelectingUnusedDriversStripMenuItem.Checked = false;
+            }
+
+            return confirmed;
         }
 
         private void ExportDriverList(IEnumerable<DriverStoreEntry> objects)
@@ -1021,11 +1047,7 @@ namespace Rapr
 
             if (driverStoreEntries.Count == 0)
             {
-                this.ShowMessageBox(
-                    Language.Message_No_Entries,
-                    Language.Export_Error,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                Dialogs.ShowMessage(this, Language.Message_No_Entries, Language.Export_Error, TaskDialogIcon.Warning);
 
                 return;
             }
@@ -1112,13 +1134,13 @@ namespace Rapr
                     }
                     catch (Win32Exception ex)
                     {
-                        this.ShowMessageBox(ex.Message, Language.Message_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        Dialogs.ShowMessage(this, ex.Message, Language.Message_Error, TaskDialogIcon.Error, ex.ToString());
                     }
                 }
             }
             else
             {
-                this.ShowMessageBox(Language.Message_Log_File_NotFound, Language.Message_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Dialogs.ShowMessage(this, Language.Message_Log_File_NotFound, Language.Message_Error, TaskDialogIcon.Error);
             }
         }
 
@@ -1455,7 +1477,7 @@ namespace Rapr
 
                     if (usePopup)
                     {
-                        this.ShowMessageBox(text, Language.Message_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        Dialogs.ShowMessage(this, text, Language.Message_Error, TaskDialogIcon.Error, detail);
                     }
 
                     break;
@@ -1467,7 +1489,7 @@ namespace Rapr
 
                     if (usePopup)
                     {
-                        this.ShowMessageBox(text, Language.Product_Name, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        Dialogs.ShowMessage(this, text, Language.Product_Name, TaskDialogIcon.Information, detail);
                     }
 
                     break;
@@ -1479,7 +1501,7 @@ namespace Rapr
 
                     if (usePopup)
                     {
-                        this.ShowMessageBox(text, Language.Message_Title_Warning, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        Dialogs.ShowMessage(this, text, Language.Message_Title_Warning, TaskDialogIcon.Warning, detail);
                     }
 
                     break;
@@ -1491,7 +1513,7 @@ namespace Rapr
 
                     if (usePopup)
                     {
-                        this.ShowMessageBox(text, Language.Product_Name, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        Dialogs.ShowMessage(this, text, Language.Product_Name, TaskDialogIcon.Information, detail);
                     }
 
                     break;
@@ -1538,22 +1560,6 @@ namespace Rapr
             {
                 this.EndOperation();
             }
-        }
-
-        private DialogResult ShowMessageBox(
-            string text,
-            string caption,
-            MessageBoxButtons buttons,
-            MessageBoxIcon icon,
-            MessageBoxDefaultButton defaultButton = MessageBoxDefaultButton.Button1)
-        {
-            return FlexibleMessageBox.Show(
-                this,
-                text,
-                caption,
-                buttons,
-                icon,
-                defaultButton);
         }
 
         private async void UseNativeDriveStoreStripMenuItem_Click(object? sender, System.EventArgs e)
