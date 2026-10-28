@@ -109,6 +109,7 @@ namespace Rapr
             this.Icon = DSEFormHelper.ExtractAssociatedIcon(Application.ExecutablePath);
             this.BuildLanguageMenu();
             this.SetupOptionsMenu();
+            this.SetupToolbar();
 
             this.lstDriverStoreEntries.PrimarySortColumn = this.driverClassColumn;
             this.lstDriverStoreEntries.PrimarySortOrder = SortOrder.Ascending;
@@ -1100,6 +1101,7 @@ namespace Rapr
                 this.InitializeComponent();
                 this.BuildLanguageMenu();
                 this.SetupOptionsMenu();
+                this.SetupToolbar();
                 this.RightToLeft = ci.TextInfo.IsRightToLeft ? RightToLeft.Yes : RightToLeft.No;
                 this.RightToLeftLayout = ci.TextInfo.IsRightToLeft;
                 this.SetupListViewColumns();
