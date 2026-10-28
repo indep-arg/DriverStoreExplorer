@@ -18,15 +18,13 @@ namespace Rapr
 
         private int layoutDpi;
 
-        private readonly StateImageCheckBoxRenderer checkBoxRenderer;
+        private readonly DarkCheckBoxRenderer checkBoxRenderer = new DarkCheckBoxRenderer();
 
         public MyObjectListView()
         {
             // ObjectListView's renderers draw checkboxes with CheckBoxRenderer, which is always the
-            // light, unscaled one. Draw the images from InitializeStateImageList instead (DPI-sized,
-            // and dark in dark mode). The search swaps the default renderer for one with a text
-            // filter, so the filter is carried over on every lookup.
-            this.checkBoxRenderer = new StateImageCheckBoxRenderer(this);
+            // light one. The search swaps the default renderer for one with a text filter, so the
+            // filter is carried over to this renderer on every lookup.
             this.CellRendererGetter = (model, column) =>
             {
                 if (column.Renderer != null)
@@ -173,7 +171,7 @@ namespace Rapr
                 graphics.Clear(images.TransparentColor);
                 if (IsDarkMode)
                 {
-                    DrawDarkCheckBox(graphics, bitmap.Size, state);
+                    DrawDarkCheckBox(graphics, new Rectangle(Point.Empty, bitmap.Size), state);
                 }
                 else
                 {
@@ -187,13 +185,15 @@ namespace Rapr
         }
 
         // The themed checkbox is always the light one, so in dark mode draw a simple dark version.
-        private static void DrawDarkCheckBox(Graphics graphics, Size size, CheckBoxState state)
+        private static void DrawDarkCheckBox(Graphics graphics, Rectangle bounds, CheckBoxState state)
         {
-            int side = Math.Max(9, (int)Math.Round(Math.Min(size.Width, size.Height) * 0.8));
-            var box = new Rectangle((size.Width - side) / 2, (size.Height - side) / 2, side - 1, side - 1);
-            bool isChecked = state == CheckBoxState.CheckedNormal;
-            bool isMixed = state == CheckBoxState.MixedNormal;
+            int side = Math.Max(9, (int)Math.Round(Math.Min(bounds.Width, bounds.Height) * 0.9));
+            var box = new Rectangle(bounds.X + (bounds.Width - side) / 2, bounds.Y + (bounds.Height - side) / 2, side - 1, side - 1);
+            // Each of these has Normal, Hot, Pressed and Disabled variants, in that order.
+            bool isChecked = state >= CheckBoxState.CheckedNormal && state <= CheckBoxState.CheckedDisabled;
+            bool isMixed = state >= CheckBoxState.MixedNormal && state <= CheckBoxState.MixedDisabled;
 
+            System.Drawing.Drawing2D.GraphicsState saved = graphics.Save();
             graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             using (var fill = new SolidBrush(isChecked || isMixed ? Color.FromArgb(76, 160, 224) : Color.FromArgb(32, 32, 32)))
             using (var border = new Pen(isChecked || isMixed ? Color.FromArgb(76, 160, 224) : Color.FromArgb(160, 160, 160)))
@@ -218,6 +218,8 @@ namespace Rapr
                     graphics.DrawLine(mark, box.Left + side * 0.25f, box.Top + side * 0.5f, box.Left + side * 0.75f, box.Top + side * 0.5f);
                 }
             }
+
+            graphics.Restore(saved);
         }
 
         /// <summary>
@@ -310,47 +312,23 @@ namespace Rapr
         }
 
         /// <summary>
-        /// Draws row checkboxes from the list's state images, chosen by the row's check state.
-        /// (ObjectListView's own UseCustomCheckboxImages picks them by StateImageIndex, which is -1
-        /// with UseCompatibleStateImageBehavior off, so it drew nothing.)
+        /// Draws the row checkboxes dark in dark mode. ObjectListView lays out the cell for the
+        /// standard checkbox glyph, so this keeps that size and position (a bigger box pushed the
+        /// INF names into an ellipsis) and only changes how it looks; in light mode it's untouched.
         /// </summary>
-        private sealed class StateImageCheckBoxRenderer : HighlightTextRenderer
+        private sealed class DarkCheckBoxRenderer : HighlightTextRenderer
         {
-            private readonly MyObjectListView owner;
-
-            public StateImageCheckBoxRenderer(MyObjectListView owner)
-            {
-                this.owner = owner;
-            }
-
-            protected override Size CalculateCheckBoxSize(Graphics g) =>
-                this.owner.StateImageList?.ImageSize ?? base.CalculateCheckBoxSize(g);
-
             protected override int DrawCheckBox(Graphics g, Rectangle r)
             {
-                ImageList images = this.owner.StateImageList;
-                int index;
-                switch (this.ListItem.CheckState)
-                {
-                    case CheckState.Checked:
-                        index = 1;
-                        break;
-                    case CheckState.Indeterminate:
-                        index = 2;
-                        break;
-                    default:
-                        index = 0;
-                        break;
-                }
-
-                if (this.IsPrinting || images == null || index >= images.Images.Count)
+                if (!IsDarkMode || this.IsPrinting)
                 {
                     return base.DrawCheckBox(g, r);
                 }
 
-                Size size = images.ImageSize;
-                g.DrawImage(images.Images[index], r.X, this.AlignVertically(r, size.Height), size.Width, size.Height);
-                return size.Width + 4;
+                Size size = this.CalculateCheckBoxSize(g);
+                var bounds = new Rectangle(r.X, this.AlignVertically(r, size.Height), size.Width, size.Height);
+                DrawDarkCheckBox(g, bounds, this.GetCheckBoxState(this.ListItem.CheckState));
+                return size.Width;
             }
         }
 
