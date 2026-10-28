@@ -545,4 +545,19 @@ Continue selecting drivers?</value>
   <data name="Menu_Options_WarnBeforeSelectingUnusedDrivers" xml:space="preserve">
     <value>Warn Before Selecting Unused Drivers</value>
   </data>
+  <data name="Menu_Options_Theme" xml:space="preserve">
+    <value>Theme</value>
+  </data>
+  <data name="Menu_Options_Theme_System" xml:space="preserve">
+    <value>Use Windows Setting</value>
+  </data>
+  <data name="Menu_Options_Theme_Light" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="Menu_Options_Theme_Dark" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="Message_Theme_Restart" xml:space="preserve">
+    <value>The new theme will be used the next time Driver Store Explorer starts.</value>
+  </data>
 </root>

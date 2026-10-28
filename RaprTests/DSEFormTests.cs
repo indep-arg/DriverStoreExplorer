@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Configuration;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.Serialization;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -459,7 +460,7 @@ namespace Rapr.Tests
         private static void WithSelectionForm(Action<DSEForm, MyObjectListView> test)
         {
             // Avoid startup/elevation; only the in-memory selection controls are exercised.
-            var form = (SelectionTestForm)FormatterServices.GetUninitializedObject(typeof(SelectionTestForm));
+            var form = (SelectionTestForm)RuntimeHelpers.GetUninitializedObject(typeof(SelectionTestForm));
             GC.SuppressFinalize(form);
             form.SelectionConfirmed = true;
 
@@ -525,10 +526,12 @@ namespace Rapr.Tests
 
         private sealed class SelectionTestForm : DSEForm
         {
+            [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
             public bool SelectionConfirmed { get; set; }
 
             public int ConfirmationCount { get; private set; }
 
+            [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
             public Action OnConfirmation { get; set; }
 
             protected override bool ConfirmUnusedDriverSelection()

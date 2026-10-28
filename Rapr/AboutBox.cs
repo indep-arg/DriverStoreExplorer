@@ -90,7 +90,7 @@ namespace Rapr
                     }
                 }
 
-                return System.IO.Path.GetFileNameWithoutExtension(Assembly.GetExecutingAssembly().CodeBase);
+                return Assembly.GetExecutingAssembly().GetName().Name;
             }
         }
 
@@ -175,7 +175,7 @@ namespace Rapr
                 url = linkLabel.Text.Substring(e.Link.Start, e.Link.Length);
             }
 
-            Process.Start(url);
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
             linkLabel.LinkVisited = true;
         }
 
@@ -223,7 +223,7 @@ namespace Rapr
 
         private void TextBoxDescription_LinkClicked(object sender, LinkClickedEventArgs e)
         {
-            Process.Start(e.LinkText);
+            Process.Start(new ProcessStartInfo(e.LinkText) { UseShellExecute = true });
         }
     }
 }

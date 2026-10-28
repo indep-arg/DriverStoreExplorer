@@ -16,8 +16,6 @@ using BrightIdeasSoftware;
 
 using JR.Utils.GUI.Forms;
 
-using Microsoft.WindowsAPICodePack.Dialogs;
-
 using Rapr.Lang;
 using Rapr.Properties;
 using Rapr.Utils;
@@ -363,6 +361,53 @@ namespace Rapr
             };
             this.warnBeforeSelectingUnusedDriversStripMenuItem.Click += this.WarnBeforeSelectingUnusedDriversStripMenuItem_Click;
             this.optionsStripMenuItem.DropDownItems.Add(this.warnBeforeSelectingUnusedDriversStripMenuItem);
+
+            var themeMenu = new ToolStripMenuItem(Language.ResourceManager.GetString("Menu_Options_Theme", Language.Culture));
+            foreach (var (value, textKey) in new[]
+            {
+                ("System", "Menu_Options_Theme_System"),
+                ("Light", "Menu_Options_Theme_Light"),
+                ("Dark", "Menu_Options_Theme_Dark"),
+            })
+            {
+                var item = new ToolStripMenuItem(Language.ResourceManager.GetString(textKey, Language.Culture))
+                {
+                    Tag = value,
+                    Checked = string.Equals(Settings.Default.ColorMode, value, StringComparison.OrdinalIgnoreCase),
+                };
+                item.Click += this.ThemeMenuItem_Click;
+                themeMenu.DropDownItems.Add(item);
+            }
+
+            this.optionsStripMenuItem.DropDownItems.Add(themeMenu);
+        }
+
+        private void ThemeMenuItem_Click(object sender, EventArgs e)
+        {
+            var selected = (ToolStripMenuItem)sender;
+            string colorMode = (string)selected.Tag;
+            if (string.Equals(Settings.Default.ColorMode, colorMode, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            foreach (ToolStripItem item in selected.Owner.Items)
+            {
+                if (item is ToolStripMenuItem menuItem)
+                {
+                    menuItem.Checked = menuItem == selected;
+                }
+            }
+
+            Settings.Default.ColorMode = colorMode;
+            Settings.Default.Save();
+
+            MessageBox.Show(
+                this,
+                Language.ResourceManager.GetString("Message_Theme_Restart", Language.Culture),
+                Language.Product_Name,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
         private void EnsureOnScreen()
@@ -617,131 +662,128 @@ namespace Rapr
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "<Pending>")]
         private async void ButtonAddDriver_Click(object sender, EventArgs e)
         {
-            using (var dialog = new CommonOpenFileDialog { IsFolderPicker = true, EnsurePathExists = true, Title = Language.Dialog_Select_Inf_Folder })
+            string infPath = FolderPicker.Pick(this, FolderPicker.AddDrivers, Language.Dialog_Select_Inf_Folder);
+            if (infPath == null)
             {
-                CommonFileDialogResult dialogResult = dialog.ShowDialog();
+                return;
+            }
 
-                if (dialogResult == CommonFileDialogResult.Ok)
+            bool installDriver = this.cbAddInstall.Checked;
+
+            List<string> infFiles;
+            try
+            {
+                infFiles = FindInfFile(infPath).ToList();
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is SecurityException)
+            {
+                // e.g. a subfolder we can't read, or a path that is too long in a deep driver bundle.
+                this.ShowStatus(Status.Error, ex.Message, ex.ToString(), true);
+                return;
+            }
+
+            if (infFiles.Count == 0)
+            {
+                this.ShowStatus(Status.Error, string.Format(Language.Message_No_Inf_Found, infPath), usePopup: true);
+                return;
+            }
+
+            try
+            {
+                this.StartOperation();
+                this.ShowStatus(Status.Normal, Language.Status_Adding_Package);
+
+                (bool allSucceeded, string detailResult) = await Task.Run(() =>
                 {
-                    string infPath = dialog.FileName;
-                    bool installDriver = this.cbAddInstall.Checked;
+                    bool totalResult = true;
+                    StringBuilder sb = new StringBuilder();
 
-                    List<string> infFiles;
-                    try
+                    if (infFiles.Count == 1)
                     {
-                        infFiles = FindInfFile(infPath).ToList();
+                        totalResult = this.driverStore.AddDriver(infFiles[0], installDriver);
+                        sb.AppendFormat(
+                            installDriver ? Language.Message_Driver_Added_Installed : Language.Message_Driver_Added,
+                            infPath);
                     }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is SecurityException)
+                    else
                     {
-                        // e.g. a subfolder we can't read, or a path that is too long in a deep driver bundle.
-                        this.ShowStatus(Status.Error, ex.Message, ex.ToString(), true);
-                        return;
-                    }
-
-                    if (infFiles.Count == 0)
-                    {
-                        this.ShowStatus(Status.Error, string.Format(Language.Message_No_Inf_Found, infPath), usePopup: true);
-                        return;
-                    }
-
-                    try
-                    {
-                        this.StartOperation();
-                        this.ShowStatus(Status.Normal, Language.Status_Adding_Package);
-
-                        (bool allSucceeded, string detailResult) = await Task.Run(() =>
+                        foreach (string infFile in infFiles)
                         {
-                            bool totalResult = true;
-                            StringBuilder sb = new StringBuilder();
+                            bool succeeded = this.driverStore.AddDriver(infFile, installDriver);
 
-                            if (infFiles.Count == 1)
+                            string resultTxt;
+                            if (succeeded)
                             {
-                                totalResult = this.driverStore.AddDriver(infFiles[0], installDriver);
-                                sb.AppendFormat(
+                                resultTxt = string.Format(
                                     installDriver ? Language.Message_Driver_Added_Installed : Language.Message_Driver_Added,
-                                    infPath);
+                                    infFile.Substring(infPath.Length).TrimStart('\\'));
+                                Trace.TraceInformation(resultTxt);
                             }
                             else
                             {
-                                foreach (string infFile in infFiles)
-                                {
-                                    bool succeeded = this.driverStore.AddDriver(infFile, installDriver);
-
-                                    string resultTxt;
-                                    if (succeeded)
-                                    {
-                                        resultTxt = string.Format(
-                                            installDriver ? Language.Message_Driver_Added_Installed : Language.Message_Driver_Added,
-                                            infFile.Substring(infPath.Length).TrimStart('\\'));
-                                        Trace.TraceInformation(resultTxt);
-                                    }
-                                    else
-                                    {
-                                        resultTxt = string.Format(
-                                            installDriver ? Language.Message_Driver_Added_Installed_Error : Language.Message_Driver_Added_Error,
-                                            infFile.Substring(infPath.Length).TrimStart('\\'));
-                                        Trace.TraceError(resultTxt);
-                                    }
-
-                                    sb.AppendLine(resultTxt);
-                                    totalResult &= succeeded;
-                                }
+                                resultTxt = string.Format(
+                                    installDriver ? Language.Message_Driver_Added_Installed_Error : Language.Message_Driver_Added_Error,
+                                    infFile.Substring(infPath.Length).TrimStart('\\'));
+                                Trace.TraceError(resultTxt);
                             }
 
-                            return (totalResult, sb.ToString());
-                        }).ConfigureAwait(true);
-
-
-                        var allDriverStoreEntries = await Task.Run(() => this.driverStore.EnumeratePackages()).ConfigureAwait(true);
-                        this.lstDriverStoreEntries.SetObjects(allDriverStoreEntries);
-
-
-                        if (infFiles.Count == 1)
-                        {
-                            if (allSucceeded)
-                            {
-                                this.ShowStatus(
-                                    Status.Success,
-                                    string.Format(
-                                        installDriver ? Language.Message_Driver_Added_Installed : Language.Message_Driver_Added,
-                                        infPath));
-                            }
-                            else
-                            {
-                                this.ShowStatus(
-                                    Status.Error,
-                                    string.Format(
-                                        installDriver ? Language.Message_Driver_Added_Installed_Error : Language.Message_Driver_Added_Error,
-                                       infPath),
-                                    usePopup: true);
-                            }
-                        }
-                        else
-                        {
-                            if (allSucceeded)
-                            {
-                                this.ShowStatus(
-                                    Status.Success,
-                                    string.Format(
-                                        installDriver ? Language.Message_Drivers_Added_Installed : Language.Message_Drivers_Added,
-                                        infFiles.Count));
-                            }
-                            else
-                            {
-                                var message = installDriver ? Language.Message_Drivers_Added_Installed_Error : Language.Message_Drivers_Added_Error;
-                                this.ShowStatus(Status.Error, $"{message}{Environment.NewLine}{detailResult}", usePopup: true);
-                            }
+                            sb.AppendLine(resultTxt);
+                            totalResult &= succeeded;
                         }
                     }
-                    catch (Exception ex)
+
+                    return (totalResult, sb.ToString());
+                }).ConfigureAwait(true);
+
+
+                var allDriverStoreEntries = await Task.Run(() => this.driverStore.EnumeratePackages()).ConfigureAwait(true);
+                this.lstDriverStoreEntries.SetObjects(allDriverStoreEntries);
+
+
+                if (infFiles.Count == 1)
+                {
+                    if (allSucceeded)
                     {
-                        this.ShowStatus(Status.Error, ex.Message, ex.ToString(), true);
+                        this.ShowStatus(
+                            Status.Success,
+                            string.Format(
+                                installDriver ? Language.Message_Driver_Added_Installed : Language.Message_Driver_Added,
+                                infPath));
                     }
-                    finally
+                    else
                     {
-                        this.EndOperation();
+                        this.ShowStatus(
+                            Status.Error,
+                            string.Format(
+                                installDriver ? Language.Message_Driver_Added_Installed_Error : Language.Message_Driver_Added_Error,
+                               infPath),
+                            usePopup: true);
                     }
                 }
+                else
+                {
+                    if (allSucceeded)
+                    {
+                        this.ShowStatus(
+                            Status.Success,
+                            string.Format(
+                                installDriver ? Language.Message_Drivers_Added_Installed : Language.Message_Drivers_Added,
+                                infFiles.Count));
+                    }
+                    else
+                    {
+                        var message = installDriver ? Language.Message_Drivers_Added_Installed_Error : Language.Message_Drivers_Added_Error;
+                        this.ShowStatus(Status.Error, $"{message}{Environment.NewLine}{detailResult}", usePopup: true);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                this.ShowStatus(Status.Error, ex.Message, ex.ToString(), true);
+            }
+            finally
+            {
+                this.EndOperation();
             }
         }
 
@@ -1087,7 +1129,7 @@ namespace Rapr
             {
                 try
                 {
-                    Process.Start(TextFileTraceListener.LastTraceFile);
+                    Process.Start(new ProcessStartInfo(TextFileTraceListener.LastTraceFile) { UseShellExecute = true });
                 }
                 catch (Win32Exception)
                 {
@@ -1473,38 +1515,36 @@ namespace Rapr
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "<Pending>")]
         private async void ButtonExportAllDrivers_Click(object sender, EventArgs e)
         {
-            using (var dialog = new CommonOpenFileDialog { IsFolderPicker = true })
+            string destinationPath = FolderPicker.Pick(this, FolderPicker.ExportDrivers);
+            if (destinationPath == null)
             {
-                CommonFileDialogResult dialogResult = dialog.ShowDialog();
+                return;
+            }
 
-                if (dialogResult == CommonFileDialogResult.Ok)
+            try
+            {
+                this.StartOperation();
+                this.ShowStatus(Status.Normal, Language.Status_Exporting_All_Drivers);
+
+                bool result = await Task.Run(() => this.driverStore.ExportAllDrivers(destinationPath)).ConfigureAwait(true);
+
+                if (result)
                 {
-                    try
-                    {
-                        this.StartOperation();
-                        this.ShowStatus(Status.Normal, Language.Status_Exporting_All_Drivers);
-
-                        bool result = await Task.Run(() => this.driverStore.ExportAllDrivers(dialog.FileName)).ConfigureAwait(true);
-
-                        if (result)
-                        {
-                            this.unusedDriversToReview.Clear();
-                            this.ShowStatus(Status.Success, Language.Message_Export_All_Drivers_Success);
-                        }
-                        else
-                        {
-                            this.ShowStatus(Status.Error, Language.Message_Export_All_Drivers_Fail, usePopup: true);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        this.ShowStatus(Status.Error, ex.Message, ex.ToString(), true);
-                    }
-                    finally
-                    {
-                        this.EndOperation();
-                    }
+                    this.unusedDriversToReview.Clear();
+                    this.ShowStatus(Status.Success, Language.Message_Export_All_Drivers_Success);
                 }
+                else
+                {
+                    this.ShowStatus(Status.Error, Language.Message_Export_All_Drivers_Fail, usePopup: true);
+                }
+            }
+            catch (Exception ex)
+            {
+                this.ShowStatus(Status.Error, ex.Message, ex.ToString(), true);
+            }
+            finally
+            {
+                this.EndOperation();
             }
         }
 
@@ -1553,27 +1593,19 @@ namespace Rapr
 
         private async void CtxMenuExportDriver_Click(object sender, System.EventArgs e)
         {
-            using (var dialog = new CommonOpenFileDialog { IsFolderPicker = true })
+            string destinationPath = FolderPicker.Pick(this, FolderPicker.ExportDrivers);
+            if (destinationPath != null)
             {
-                CommonFileDialogResult dialogResult = dialog.ShowDialog();
-
-                if (dialogResult == CommonFileDialogResult.Ok)
-                {
-                    await ExportDrivers(this.lstDriverStoreEntries.SelectedObjects, dialog.FileName);
-                }
+                await ExportDrivers(this.lstDriverStoreEntries.SelectedObjects, destinationPath);
             }
         }
 
         private async void ButtonExportDrivers_Click(object sender, System.EventArgs e)
         {
-            using (var dialog = new CommonOpenFileDialog { IsFolderPicker = true })
+            string destinationPath = FolderPicker.Pick(this, FolderPicker.ExportDrivers);
+            if (destinationPath != null)
             {
-                CommonFileDialogResult dialogResult = dialog.ShowDialog();
-
-                if (dialogResult == CommonFileDialogResult.Ok)
-                {
-                    await ExportDrivers(this.lstDriverStoreEntries.CheckedObjects, dialog.FileName);
-                }
+                await ExportDrivers(this.lstDriverStoreEntries.CheckedObjects, destinationPath);
             }
         }
 

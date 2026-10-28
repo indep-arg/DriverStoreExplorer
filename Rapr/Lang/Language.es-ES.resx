@@ -545,4 +545,19 @@ Borrarlos puede hacer que los programas o dispositivos dejen de funcionar. Revis
   <data name="Menu_Options_WarnBeforeSelectingUnusedDrivers" xml:space="preserve">
     <value>Advertir antes de seleccionar controladores sin usar</value>
   </data>
+  <data name="Menu_Options_Theme" xml:space="preserve">
+    <value>Tema</value>
+  </data>
+  <data name="Menu_Options_Theme_System" xml:space="preserve">
+    <value>Usar la configuración de Windows</value>
+  </data>
+  <data name="Menu_Options_Theme_Light" xml:space="preserve">
+    <value>Claro</value>
+  </data>
+  <data name="Menu_Options_Theme_Dark" xml:space="preserve">
+    <value>Oscuro</value>
+  </data>
+  <data name="Message_Theme_Restart" xml:space="preserve">
+    <value>El nuevo tema se aplicará la próxima vez que se abra Driver Store Explorer.</value>
+  </data>
 </root>

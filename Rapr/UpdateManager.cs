@@ -8,7 +8,9 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
+using System.Reflection.PortableExecutable;
 using System.Runtime.Serialization;
+using System.Runtime.InteropServices;
 using System.Runtime.Serialization.Json;
 using System.Security.Cryptography;
 using System.Text;
@@ -34,8 +36,6 @@ namespace Rapr
 
         public async Task<VersionInfo> GetLatestVersionInfo()
         {
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-
             using (var response = await this.httpClient.GetAsync(new Uri(versionInfoUrl)).ConfigureAwait(false))
             {
                 if (response.IsSuccessStatusCode)
@@ -101,8 +101,6 @@ namespace Rapr
                 throw new InvalidOperationException("The release does not provide a SHA-256 digest for the download.");
             }
 
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-
             string tempBaseDir = Path.Combine(Path.GetTempPath(), "DriverStoreExplorer");
             string downloadFileName = Path.GetFileName(versionInfo.DownloadUrl.LocalPath);
             string tempZipPath = Path.Combine(tempBaseDir, downloadFileName);
@@ -155,7 +153,7 @@ namespace Rapr
                 sourceDir = subDirs[0];
             }
 
-            InstallUpdate(sourceDir, Assembly.GetExecutingAssembly().Location);
+            InstallUpdate(sourceDir, Environment.ProcessPath);
 
             // Clean up temp folder
             try { Directory.Delete(tempBaseDir, true); } catch { }
@@ -347,44 +345,22 @@ namespace Rapr
 
         private static void ValidateUpdateExecutable(string path)
         {
-            // Isolate reflection-only loads so retries never reuse an earlier payload's metadata.
-            var domain = AppDomain.CreateDomain("Update payload validation");
-            try
+            // Releases are single-file apps: a native launcher with the .NET app bundled inside, so
+            // only the PE header can be checked. The SHA-256 digest ties the file to the release.
+            // A file that isn't a PE image at all throws BadImageFormatException here.
+            using (var stream = File.OpenRead(path))
+            using (var reader = new PEReader(stream))
             {
-                var validator = (ExecutableValidator)domain.CreateInstanceFromAndUnwrap(
-                    typeof(UpdateManager).Assembly.Location, typeof(ExecutableValidator).FullName);
-                validator.Validate(path, typeof(UpdateManager).Assembly.GetName().Name);
-            }
-            finally
-            {
-                AppDomain.Unload(domain);
-            }
-        }
+                CoffHeader coff = reader.PEHeaders.CoffHeader;
+                Machine expectedMachine = RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? Machine.Arm64 : Machine.Amd64;
 
-        public sealed class ExecutableValidator : MarshalByRefObject
-        {
-            public void Validate(string path, string expectedName)
-            {
-                var assembly = Assembly.ReflectionOnlyLoad(File.ReadAllBytes(path));
-                assembly.ManifestModule.GetPEKind(out PortableExecutableKinds kind, out ImageFileMachine machine);
-                if (assembly.GetName().Name != expectedName
-                    || assembly.EntryPoint == null || !assembly.EntryPoint.IsStatic
-                    || (kind & PortableExecutableKinds.ILOnly) == 0
-                    || (machine != ImageFileMachine.I386 && machine != ImageFileMachine.AMD64)
-                    || (machine == ImageFileMachine.AMD64 && !Environment.Is64BitOperatingSystem))
+                // Managed .dll files (including a renamed Rapr.dll) are rejected by the first check.
+                if ((coff.Characteristics & Characteristics.Dll) != 0
+                    || (coff.Characteristics & Characteristics.ExecutableImage) == 0
+                    || coff.Machine != expectedMachine
+                    || reader.PEHeaders.PEHeader?.Subsystem != Subsystem.WindowsGui)
                 {
                     throw new InvalidDataException();
-                }
-
-                using (var reader = new BinaryReader(File.OpenRead(path)))
-                {
-                    reader.BaseStream.Position = 0x3c;
-                    int peOffset = reader.ReadInt32();
-                    reader.BaseStream.Position = peOffset + 22;
-                    if ((reader.ReadUInt16() & 0x2000) != 0)
-                    {
-                        throw new InvalidDataException();
-                    }
                 }
             }
         }

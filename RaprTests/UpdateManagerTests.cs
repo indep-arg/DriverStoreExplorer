@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Reflection;
-using System.Reflection.Emit;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -111,11 +110,8 @@ namespace Rapr.Tests
         {
             string currentExePath = Path.Combine(this.appDirectory, "Rapr.exe");
             File.WriteAllText(currentExePath, "original executable");
-            var library = AppDomain.CurrentDomain.DefineDynamicAssembly(
-                new AssemblyName("Rapr"), AssemblyBuilderAccess.Save, this.sourceDirectory);
-            library.DefineDynamicModule("Library", "Rapr.dll");
-            library.Save("Rapr.dll");
-            File.Move(Path.Combine(this.sourceDirectory, "Rapr.dll"), Path.Combine(this.sourceDirectory, "Rapr.exe"));
+            // Rapr.dll holds the app's code, but it's a library, not the executable.
+            File.Copy(typeof(UpdateManager).Assembly.Location, Path.Combine(this.sourceDirectory, "Rapr.exe"));
 
             Assert.ThrowsExactly<InvalidDataException>(() => InstallUpdate(this.sourceDirectory, currentExePath));
 
@@ -137,7 +133,7 @@ namespace Rapr.Tests
             InstallUpdate(this.sourceDirectory, currentExePath);
 
             CollectionAssert.AreEqual(
-                File.ReadAllBytes(typeof(UpdateManager).Assembly.Location),
+                File.ReadAllBytes(AppHostPath),
                 File.ReadAllBytes(currentExePath));
             Assert.AreEqual("updated configuration", File.ReadAllText(currentExePath + ".config"));
             Assert.AreEqual("original executable", File.ReadAllText(currentExePath + ".old"));
@@ -253,9 +249,12 @@ namespace Rapr.Tests
             Assert.IsFalse(File.Exists(currentExePath + ".old"));
         }
 
+        // The launcher the SDK builds for Rapr; it's copied next to the tests with Rapr.dll.
+        private static string AppHostPath => Path.Combine(AppContext.BaseDirectory, "Rapr.exe");
+
         private void CreateExecutablePayload()
         {
-            File.Copy(typeof(UpdateManager).Assembly.Location, Path.Combine(this.sourceDirectory, "Rapr.exe"));
+            File.Copy(AppHostPath, Path.Combine(this.sourceDirectory, "Rapr.exe"));
         }
     }
 }

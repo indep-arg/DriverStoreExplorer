@@ -1,26 +1,25 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net472</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
     <LangVersion>latest</LangVersion>
     <OutputType>Library</OutputType>
     <RootNamespace>Rapr.Tests</RootNamespace>
     <AssemblyName>Rapr.Tests</AssemblyName>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageReference Include="MSTest.TestAdapter" Version="4.5.1" />
     <PackageReference Include="MSTest.TestFramework" Version="4.5.1" />
-    <PackageReference Include="PortableSettingsProvider" Version="0.2.5" ExcludeAssets="compile;runtime" />
+    <PackageReference Include="PortableSettingsProvider" Version="0.2.5" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.VisualBasic" />
-    <Reference Include="System.Configuration" />
-    <Reference Include="System.Drawing" />
-    <Reference Include="System.Windows.Forms" />
-    <Reference Include="PortableSettingsProvider">
-      <HintPath>..\Rapr\obj\$(Configuration)\SignedAssemblies\PortableSettingsProvider.dll</HintPath>
-    </Reference>
     <ProjectReference Include="..\Rapr\Rapr.csproj" />
   </ItemGroup>
+  <!-- The updater tests install Rapr's launcher (Rapr.exe) as a real executable payload. -->
+  <Target Name="CopyRaprAppHost" AfterTargets="Build">
+    <Copy SourceFiles="..\Rapr\bin\$(Configuration)\Rapr.exe" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('..\Rapr\bin\$(Configuration)\Rapr.exe')" />
+  </Target>
 </Project>

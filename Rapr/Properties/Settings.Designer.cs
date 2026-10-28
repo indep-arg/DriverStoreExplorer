@@ -160,5 +160,18 @@ namespace Rapr.Properties {
                 this["WarnBeforeSelectingUnusedDrivers"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("System")]
+        [global::System.Configuration.SettingsManageabilityAttribute(global::System.Configuration.SettingsManageability.Roaming)]
+        public string ColorMode {
+            get {
+                return ((string)(this["ColorMode"]));
+            }
+            set {
+                this["ColorMode"] = value;
+            }
+        }
     }
 }

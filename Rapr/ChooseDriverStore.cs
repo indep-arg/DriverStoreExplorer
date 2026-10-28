@@ -3,8 +3,6 @@ using System.ComponentModel;
 using System.IO;
 using System.Windows.Forms;
 
-using Microsoft.WindowsAPICodePack.Dialogs;
-
 namespace Rapr
 {
     public partial class ChooseDriverStore : Form, INotifyPropertyChanged
@@ -15,6 +13,7 @@ namespace Rapr
 
         private DriverStoreType storeType;
 
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public DriverStoreType StoreType
         {
             get
@@ -30,6 +29,7 @@ namespace Rapr
 
         private string offlineStoreLocation;
 
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public string OfflineStoreLocation
         {
             get
@@ -98,33 +98,25 @@ namespace Rapr
 
         private void ButtonBrowseLocation_Click(object sender, EventArgs e)
         {
-            using (var dialog = new CommonOpenFileDialog
+            string selectedPath = FolderPicker.Pick(this, FolderPicker.OfflineStore, Lang.Language.Dialog_Select_Offline_Store_Title);
+            if (selectedPath == null)
             {
-                IsFolderPicker = true,
-                Title = Lang.Language.Dialog_Select_Offline_Store_Title,
-            })
-            {
-                CommonFileDialogResult result = dialog.ShowDialog();
-
-                if (result == CommonFileDialogResult.Ok)
-                {
-                    string selectedPath = dialog.FileName;
-                    
-                    // Validate that the selected directory contains a Windows folder
-                    if (!IsValidOfflineStoreLocation(selectedPath))
-                    {
-                        MessageBox.Show(
-                            this,
-                            Lang.Language.Message_Invalid_Offline_Store_Location, 
-                            Lang.Language.Message_Invalid_Offline_Store_Title, 
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Warning);
-                        return;
-                    }
-                    
-                    this.OfflineStoreLocation = selectedPath;
-                }
+                return;
             }
+
+            // Validate that the selected directory contains a Windows folder
+            if (!IsValidOfflineStoreLocation(selectedPath))
+            {
+                MessageBox.Show(
+                    this,
+                    Lang.Language.Message_Invalid_Offline_Store_Location,
+                    Lang.Language.Message_Invalid_Offline_Store_Title,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            this.OfflineStoreLocation = selectedPath;
         }
 
         /// <summary>

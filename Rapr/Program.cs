@@ -14,28 +14,28 @@ namespace Rapr
 {
     public static class Program
     {
-        static Program()
+        // WinForms dark mode is still marked experimental in .NET 10 (WFO5001). It has to be set
+        // before the first window is created, so a change from the Options menu applies on restart.
+#pragma warning disable WFO5001
+        private static void ApplyColorMode(string colorMode)
         {
-            AppDomain.CurrentDomain.AssemblyResolve += ResolveEventHandler;
-        }
-
-        private static Assembly ResolveEventHandler(object sender, ResolveEventArgs args)
-        {
-            Assembly assembly = Assembly.GetEntryAssembly();
-            string resourceName = $"{assembly.EntryPoint.DeclaringType.Namespace}.{new AssemblyName(args.Name).Name}.dll";
-
-            using (var stream = assembly.GetManifestResourceStream(resourceName))
+            SystemColorMode mode;
+            switch (colorMode)
             {
-                if (stream == null)
-                {
-                    return null;
-                }
-
-                byte[] assemblyData = new byte[stream.Length];
-                _ = stream.Read(assemblyData, 0, assemblyData.Length);
-                return Assembly.Load(assemblyData);
+                case "Light":
+                    mode = SystemColorMode.Classic;
+                    break;
+                case "Dark":
+                    mode = SystemColorMode.Dark;
+                    break;
+                default:
+                    mode = SystemColorMode.System;
+                    break;
             }
+
+            Application.SetColorMode(mode);
         }
+#pragma warning restore WFO5001
 
         private static void AddEnvironmentPaths(string path)
         {
@@ -66,7 +66,7 @@ namespace Rapr
             if (configDirectory.Exists)
             {
                 // Remove configurations created by not strong signed app.
-                foreach (var dir in configDirectory.EnumerateDirectories(Assembly.GetEntryAssembly().ManifestModule.Name + "_Url_*", SearchOption.TopDirectoryOnly))
+                foreach (var dir in configDirectory.EnumerateDirectories(Path.GetFileName(Environment.ProcessPath) + "_Url_*", SearchOption.TopDirectoryOnly))
                 {
                     dir.Delete(recursive: true);
                 }
@@ -98,8 +98,8 @@ namespace Rapr
         [STAThread]
         public static void Main()
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
+            // Visual styles, text rendering and PerMonitorV2 DPI awareness, as set in Rapr.csproj.
+            ApplicationConfiguration.Initialize();
 
             Trace.AutoFlush = true;
             Trace.IndentSize = 4;
@@ -187,6 +187,7 @@ namespace Rapr
                 }
 
                 DriverStoreFactory.ValidateDriverStoreOption();
+                ApplyColorMode(Properties.Settings.Default.ColorMode);
 
                 using (DSEForm mainForm = new DSEForm())
                 {
