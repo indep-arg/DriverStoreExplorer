@@ -16,6 +16,13 @@ namespace Rapr
         private int layoutDpi;
 
         /// <summary>
+        /// Gets whether the app runs with WinForms' dark color mode (Options > Theme).
+        /// </summary>
+#pragma warning disable WFO5001 // Dark mode is still marked experimental in .NET 10.
+        internal static bool IsDarkMode => Application.IsDarkModeEnabled;
+#pragma warning restore WFO5001
+
+        /// <summary>
         /// Builds the checkbox images. ObjectListView attaches an empty ImageList to the ListView and
         /// then adds the images to it, but with UseCompatibleStateImageBehavior off, attaching it
         /// recreates the native list view, which destroys that image list (see the comments in
@@ -60,6 +67,46 @@ namespace Rapr
         {
             base.OnHandleCreated(e);
             this.layoutDpi = this.DeviceDpi;
+
+            if (IsDarkMode)
+            {
+                this.ApplyDarkStyle();
+            }
+        }
+
+        /// <summary>
+        /// ObjectListView draws its header and items itself, so WinForms' dark mode only reaches part
+        /// of it: the header stayed white and the group titles were dark blue on black.
+        /// </summary>
+        private void ApplyDarkStyle()
+        {
+            // The header is custom drawn whenever the list is sorted, so give it dark colors.
+            var header = new HeaderFormatStyle();
+            header.SetBackColor(Color.FromArgb(43, 43, 43));
+            header.SetForeColor(Color.FromArgb(222, 222, 222));
+            header.Hot.BackColor = Color.FromArgb(60, 60, 60);
+            header.Pressed.BackColor = Color.FromArgb(75, 75, 75);
+            foreach (HeaderStateStyle state in new[] { header.Normal, header.Hot, header.Pressed })
+            {
+                state.FrameColor = Color.FromArgb(70, 70, 70);
+                state.FrameWidth = 1;
+            }
+
+            this.HeaderUsesThemes = false;
+            this.HeaderFormatStyle = header;
+
+            // Grid lines are drawn light across the dark group rows.
+            this.GridLines = false;
+
+            // Explorer's dark items view draws readable group titles. WinForms sets its own dark
+            // theme on the next message, so this is queued after it.
+            this.BeginInvoke(new Action(() =>
+            {
+                if (this.IsHandleCreated)
+                {
+                    _ = SafeNativeMethods.SetWindowTheme(this.Handle, "DarkMode_ItemsView", null);
+                }
+            }));
         }
 
         /// <summary>
@@ -95,12 +142,53 @@ namespace Rapr
             using (Graphics graphics = Graphics.FromImage(bitmap))
             {
                 graphics.Clear(images.TransparentColor);
-                Size glyph = CheckBoxRenderer.GetGlyphSize(graphics, state);
-                var location = new Point((bitmap.Width - glyph.Width) / 2, (bitmap.Height - glyph.Height) / 2);
-                CheckBoxRenderer.DrawCheckBox(graphics, location, state);
+                if (IsDarkMode)
+                {
+                    DrawDarkCheckBox(graphics, bitmap.Size, state);
+                }
+                else
+                {
+                    Size glyph = CheckBoxRenderer.GetGlyphSize(graphics, state);
+                    var location = new Point((bitmap.Width - glyph.Width) / 2, (bitmap.Height - glyph.Height) / 2);
+                    CheckBoxRenderer.DrawCheckBox(graphics, location, state);
+                }
             }
 
             images.Images.Add(key, bitmap);
+        }
+
+        // The themed checkbox is always the light one, so in dark mode draw a simple dark version.
+        private static void DrawDarkCheckBox(Graphics graphics, Size size, CheckBoxState state)
+        {
+            int side = Math.Max(9, (int)Math.Round(Math.Min(size.Width, size.Height) * 0.8));
+            var box = new Rectangle((size.Width - side) / 2, (size.Height - side) / 2, side - 1, side - 1);
+            bool isChecked = state == CheckBoxState.CheckedNormal;
+            bool isMixed = state == CheckBoxState.MixedNormal;
+
+            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using (var fill = new SolidBrush(isChecked || isMixed ? Color.FromArgb(76, 160, 224) : Color.FromArgb(32, 32, 32)))
+            using (var border = new Pen(isChecked || isMixed ? Color.FromArgb(76, 160, 224) : Color.FromArgb(160, 160, 160)))
+            {
+                graphics.FillRectangle(fill, box);
+                graphics.DrawRectangle(border, box);
+            }
+
+            using (var mark = new Pen(Color.Black, Math.Max(1.5f, side / 8f)))
+            {
+                if (isChecked)
+                {
+                    graphics.DrawLines(mark, new[]
+                    {
+                        new PointF(box.Left + side * 0.22f, box.Top + side * 0.52f),
+                        new PointF(box.Left + side * 0.42f, box.Top + side * 0.72f),
+                        new PointF(box.Left + side * 0.78f, box.Top + side * 0.30f),
+                    });
+                }
+                else if (isMixed)
+                {
+                    graphics.DrawLine(mark, box.Left + side * 0.25f, box.Top + side * 0.5f, box.Left + side * 0.75f, box.Top + side * 0.5f);
+                }
+            }
         }
 
         /// <summary>

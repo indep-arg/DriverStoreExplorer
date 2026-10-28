@@ -1387,7 +1387,10 @@ namespace Rapr
         {
             if (e.Item.Checked)
             {
-                e.Item.BackColor = Color.FromArgb(unchecked((int)0xFFCBE8F6));
+                // Light blue, or a dark blue that keeps the light text readable in dark mode.
+                e.Item.BackColor = MyObjectListView.IsDarkMode
+                    ? Color.FromArgb(0x26, 0x4F, 0x78)
+                    : Color.FromArgb(unchecked((int)0xFFCBE8F6));
             }
         }
 
