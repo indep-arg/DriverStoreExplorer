@@ -1,0 +1,88 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Experimental WinUI 3 front end. It shares the driver store code and the translations with
+    the WinForms app by linking the files from ..\Rapr, so both stay in step. Nothing under
+    ..\Rapr is changed for it; its own strings are in Strings\WinUIStrings.resx.
+    Build it on Windows: the XAML compiler only runs there.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>Rapr.WinUI</RootNamespace>
+    <AssemblyName>DriverStoreExplorer</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\Rapr\icon.ico</ApplicationIcon>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <UseWinUI>true</UseWinUI>
+    <!-- An unpackaged exe that carries the Windows App SDK with it: nothing else to install. -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+    <NeutralLanguage>en</NeutralLanguage>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == '' And '$(Platform)' == 'ARM64'">
+    <RuntimeIdentifier>win-arm64</RuntimeIdentifier>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == ''">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" />
+    <PackageReference Include="Microsoft.Dism" Version="6.1.0" />
+  </ItemGroup>
+
+  <!-- The shared code: driver store backends, device matching, the translations. -->
+  <ItemGroup>
+    <Compile Include="..\Rapr\DriverStoreType.cs" Link="Shared\DriverStoreType.cs" />
+    <Compile Include="..\Rapr\Lang\Language.Designer.cs" Link="Shared\Lang\Language.Designer.cs" />
+    <Compile Include="..\Rapr\Utils\ConfigManager.cs" Link="Shared\Utils\ConfigManager.cs" />
+    <Compile Include="..\Rapr\Utils\DeviceDriverInfo.cs" Link="Shared\Utils\DeviceDriverInfo.cs" />
+    <Compile Include="..\Rapr\Utils\DeviceHelper.cs" Link="Shared\Utils\DeviceHelper.cs" />
+    <Compile Include="..\Rapr\Utils\DismUtil.cs" Link="Shared\Utils\DismUtil.cs" />
+    <Compile Include="..\Rapr\Utils\DriverStoreEntry.cs" Link="Shared\Utils\DriverStoreEntry.cs" />
+    <Compile Include="..\Rapr\Utils\DriverStoreRepository.cs" Link="Shared\Utils\DriverStoreRepository.cs" />
+    <Compile Include="..\Rapr\Utils\IDriverStore.cs" Link="Shared\Utils\IDriverStore.cs" />
+    <Compile Include="..\Rapr\Utils\LinqExtensions.cs" Link="Shared\Utils\LinqExtensions.cs" />
+    <Compile Include="..\Rapr\Utils\NativeDriverStore.cs" Link="Shared\Utils\NativeDriverStore.cs" />
+    <Compile Include="..\Rapr\Utils\PNPUtil.cs" Link="Shared\Utils\PNPUtil.cs" />
+    <Compile Include="..\Rapr\Utils\SetupAPI.cs" Link="Shared\Utils\SetupAPI.cs" />
+    <Content Include="..\Rapr\icon.ico" Link="icon.ico" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Same manifest names as in the WinForms app, so Language.Designer.cs finds them. -->
+    <EmbeddedResource Include="..\Rapr\Lang\Language*.resx" Link="Lang\%(Filename)%(Extension)" LogicalName="Rapr.Lang.%(Filename).resources" />
+  </ItemGroup>
+
+
+  <!--
+    The linked driver store code predates nullable annotations, so with them on it raises dozens
+    of warnings in files this project can't change. Turn those warnings off for the linked files
+    only; this project's own code keeps the checks.
+  -->
+  <Target Name="QuietNullableWarningsInSharedCode" BeforeTargets="BeforeBuild">
+    <PropertyGroup>
+      <_SharedCodeConfig>$(IntermediateOutputPath)SharedCode.globalconfig</_SharedCodeConfig>
+      <_NullableRules>dotnet_diagnostic.CS8600.severity = none%0Adotnet_diagnostic.CS8601.severity = none%0Adotnet_diagnostic.CS8602.severity = none%0Adotnet_diagnostic.CS8603.severity = none%0Adotnet_diagnostic.CS8604.severity = none%0Adotnet_diagnostic.CS8605.severity = none%0Adotnet_diagnostic.CS8618.severity = none%0Adotnet_diagnostic.CS8625.severity = none</_NullableRules>
+    </PropertyGroup>
+    <ItemGroup>
+      <_SharedCodeFile Include="@(Compile)" Condition="$([System.String]::Copy('%(Compile.Link)').StartsWith('Shared'))">
+        <ConfigPath>$([System.String]::Copy('%(FullPath)').Replace('\','/'))</ConfigPath>
+      </_SharedCodeFile>
+      <_SharedCodeConfigLine Include="is_global = true" />
+      <_SharedCodeConfigLine Include="@(_SharedCodeFile->'%0A[%(ConfigPath)]%0A$(_NullableRules)')" />
+    </ItemGroup>
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <WriteLinesToFile File="$(_SharedCodeConfig)" Lines="@(_SharedCodeConfigLine)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <EditorConfigFiles Include="$(_SharedCodeConfig)" />
+      <FileWrites Include="$(_SharedCodeConfig)" />
+    </ItemGroup>
+  </Target>
+
+</Project>
