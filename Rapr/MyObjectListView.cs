@@ -1,6 +1,9 @@
+using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Text.Json;
 using System.Windows.Forms;
+using System.Windows.Forms.VisualStyles;
 
 using BrightIdeasSoftware;
 
@@ -10,6 +13,103 @@ namespace Rapr
 {
     public sealed class MyObjectListView : TypedObjectListView<DriverStoreEntry>
     {
+        private int layoutDpi;
+
+        /// <summary>
+        /// Builds the checkbox images. ObjectListView's own version keeps a Graphics open on each
+        /// bitmap while adding it to the ImageList, which .NET 10 rejects ("cannot add the image to
+        /// the ImageList") and crashed the app at startup. It also always drew them at 16 pixels;
+        /// these are sized for the monitor's DPI.
+        /// </summary>
+        protected override void InitializeStateImageList()
+        {
+            if (this.DesignMode || !this.CheckBoxes)
+            {
+                return;
+            }
+
+            int width = this.LogicalToDeviceUnits(16);
+            int height = this.RowHeight == -1 ? width : this.RowHeight;
+            if (this.StateImageList == null || this.StateImageList.ImageSize != new Size(width, height))
+            {
+                this.StateImageList = new ImageList
+                {
+                    ImageSize = new Size(width, height),
+                    ColorDepth = ColorDepth.Depth32Bit,
+                };
+            }
+
+            ImageList images = this.StateImageList;
+            if (images.Images.Count == 0)
+            {
+                AddCheckBoxImage(images, "checkbox-unchecked", CheckBoxState.UncheckedNormal);
+            }
+
+            if (images.Images.Count <= 1)
+            {
+                AddCheckBoxImage(images, "checkbox-checked", CheckBoxState.CheckedNormal);
+            }
+
+            if (this.TriStateCheckBoxes && images.Images.Count <= 2)
+            {
+                AddCheckBoxImage(images, "checkbox-indeterminate", CheckBoxState.MixedNormal);
+            }
+            else if (images.Images.ContainsKey("checkbox-indeterminate"))
+            {
+                images.Images.RemoveByKey("checkbox-indeterminate");
+            }
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            this.layoutDpi = this.DeviceDpi;
+        }
+
+        /// <summary>
+        /// WinForms rescales fonts and controls when the window moves to a monitor with another
+        /// DPI, but not the list's column widths or checkbox images.
+        /// </summary>
+        protected override void OnDpiChangedAfterParent(EventArgs e)
+        {
+            base.OnDpiChangedAfterParent(e);
+
+            int oldDpi = this.layoutDpi;
+            this.layoutDpi = this.DeviceDpi;
+            if (oldDpi == 0 || oldDpi == this.DeviceDpi)
+            {
+                return;
+            }
+
+            foreach (OLVColumn column in this.AllColumns)
+            {
+                if (column.Width > 0)
+                {
+                    column.Width = (int)Math.Round(column.Width * (double)this.DeviceDpi / oldDpi);
+                }
+            }
+
+            if (this.CheckBoxes)
+            {
+                this.StateImageList = null;
+                this.InitializeStateImageList();
+            }
+        }
+
+        private static void AddCheckBoxImage(ImageList images, string key, CheckBoxState state)
+        {
+            var bitmap = new Bitmap(images.ImageSize.Width, images.ImageSize.Height);
+            using (Graphics graphics = Graphics.FromImage(bitmap))
+            {
+                graphics.Clear(images.TransparentColor);
+                Size glyph = CheckBoxRenderer.GetGlyphSize(graphics, state);
+                var location = new Point((bitmap.Width - glyph.Width) / 2, (bitmap.Height - glyph.Height) / 2);
+                CheckBoxRenderer.DrawCheckBox(graphics, location, state);
+            }
+
+            images.Images.Add(key, bitmap);
+        }
+
         /// <summary>
         /// Saves the view, sort and column layout. ObjectListView's own implementation uses
         /// BinaryFormatter, which .NET 9 and later no longer support, so this writes JSON instead.
