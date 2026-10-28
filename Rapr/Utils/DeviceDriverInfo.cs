@@ -4,21 +4,21 @@ namespace Rapr.Utils
 {
     public class DeviceDriverInfo
     {
-        public string DeviceId { get; }
+        public string? DeviceId { get; }
 
-        public string DeviceName { get; }
+        public string? DeviceName { get; }
 
-        public string DriverInf { get; }
+        public string? DriverInf { get; }
 
         public DateTime DriverDate { get; }
 
-        public Version DriverVersion { get; }
+        public Version? DriverVersion { get; }
 
         public bool? IsPresent { get; }
 
-        public string[] ExtendedInfs { get; set; }
+        public string[]? ExtendedInfs { get; set; }
 
-        public DeviceDriverInfo(string deviceId, string name, string inf, DateTime driverDate, Version driverVersion, bool? isPresent, string[] extendedInfs)
+        public DeviceDriverInfo(string? deviceId, string? name, string? inf, DateTime driverDate, Version? driverVersion, bool? isPresent, string[]? extendedInfs)
         {
             this.DeviceId = deviceId;
             this.DeviceName = name;

@@ -7,7 +7,7 @@ namespace Rapr
 {
     public partial class ChooseDriverStore : Form, INotifyPropertyChanged
     {
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         private void NotifyPropertyChanged(string fieldName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(fieldName));
 
@@ -27,10 +27,10 @@ namespace Rapr
             }
         }
 
-        private string offlineStoreLocation;
+        private string? offlineStoreLocation;
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-        public string OfflineStoreLocation
+        public string? OfflineStoreLocation
         {
             get
             {
@@ -85,20 +85,20 @@ namespace Rapr
 
             binding.Parse += (s, arg) =>
             {
-                if ((bool)arg.Value)
+                if (arg.Value is true)
                 {
                     arg.Value = trueValue;
                 }
             };
 
-            binding.Format += (s, arg) => arg.Value = ((T)arg.Value).Equals(trueValue);
+            binding.Format += (s, arg) => arg.Value = Equals(arg.Value, trueValue);
 
             radio.DataBindings.Add(binding);
         }
 
-        private void ButtonBrowseLocation_Click(object sender, EventArgs e)
+        private void ButtonBrowseLocation_Click(object? sender, EventArgs e)
         {
-            string selectedPath = FolderPicker.Pick(this, FolderPicker.OfflineStore, Lang.Language.Dialog_Select_Offline_Store_Title);
+            string? selectedPath = FolderPicker.Pick(this, FolderPicker.OfflineStore, Lang.Language.Dialog_Select_Offline_Store_Title);
             if (selectedPath == null)
             {
                 return;

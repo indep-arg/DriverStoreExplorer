@@ -47,23 +47,27 @@ namespace Rapr
         private static void CleanUpOldConfig()
         {
             FileInfo fileInfo = new FileInfo(ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.PerUserRoamingAndLocal).FilePath);
-            DirectoryInfo strongAssemblyConfigDirectory = fileInfo.Directory.Parent;
+            DirectoryInfo? strongAssemblyConfigDirectory = fileInfo.Directory?.Parent;
+            if (strongAssemblyConfigDirectory == null)
+            {
+                return;
+            }
 
             if (strongAssemblyConfigDirectory.Exists)
             {
                 // Remove old version of config.
                 foreach (var dir in strongAssemblyConfigDirectory.EnumerateDirectories("*", SearchOption.TopDirectoryOnly))
                 {
-                    if (Version.TryParse(dir.Name, out Version version) && version < Assembly.GetExecutingAssembly().GetName().Version)
+                    if (Version.TryParse(dir.Name, out Version? version) && version < Assembly.GetExecutingAssembly().GetName().Version)
                     {
                         dir.Delete(recursive: true);
                     }
                 }
             }
 
-            DirectoryInfo configDirectory = strongAssemblyConfigDirectory.Parent;
+            DirectoryInfo? configDirectory = strongAssemblyConfigDirectory.Parent;
 
-            if (configDirectory.Exists)
+            if (configDirectory?.Exists == true)
             {
                 // Remove configurations created by not strong signed app.
                 foreach (var dir in configDirectory.EnumerateDirectories(Path.GetFileName(Environment.ProcessPath) + "_Url_*", SearchOption.TopDirectoryOnly))
@@ -78,7 +82,7 @@ namespace Rapr
             Trace.TraceError($"Unhandled exception: {exception}");
         }
 
-        private static void OnThreadException(object sender, ThreadExceptionEventArgs e)
+        private static void OnThreadException(object? sender, ThreadExceptionEventArgs e)
         {
             LogUnhandledException(e.Exception);
 
@@ -89,6 +93,19 @@ namespace Rapr
                 {
                     Application.Exit();
                 }
+            }
+        }
+
+        private static bool TryRestartAsAdministrator()
+        {
+            try
+            {
+                return DSEFormHelper.RunAsAdministrator();
+            }
+            catch (System.ComponentModel.Win32Exception ex)
+            {
+                Trace.TraceWarning($"Could not restart as administrator: {ex}");
+                return false;
             }
         }
 
@@ -184,6 +201,18 @@ namespace Rapr
                     {
                         Trace.TraceError(e.ToString());
                     }
+                }
+
+                // The manifest asks for elevation, so this only runs when that was bypassed.
+                if (!DSEFormHelper.IsRunAsAdmin)
+                {
+                    if (!DSEFormHelper.IsElevationAttempted && TryRestartAsAdministrator())
+                    {
+                        return;
+                    }
+
+                    MessageBox.Show(Language.Message_Requires_Admin, Language.Product_Name, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
                 }
 
                 DriverStoreFactory.ValidateDriverStoreOption();

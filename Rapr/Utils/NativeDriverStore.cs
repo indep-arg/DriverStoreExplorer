@@ -17,7 +17,11 @@ namespace Rapr.Utils
     {
         public DriverStoreType Type { get; }
 
-        public string OfflineStoreLocation { get; }
+        public string? OfflineStoreLocation { get; }
+
+        // Only offline stores have a location; the online code paths never read it.
+        private string OfflineRoot => this.OfflineStoreLocation
+            ?? throw new InvalidOperationException("This driver store is not an offline image.");
 
         public NativeDriverStore()
         {
@@ -55,8 +59,8 @@ namespace Rapr.Utils
                     break;
 
                 case DriverStoreType.Offline:
-                    string targetSystemPath = Path.Combine(this.OfflineStoreLocation, "Windows");
-                    ptr = NativeMethods.DriverStoreOpen(targetSystemPath, this.OfflineStoreLocation, 0, IntPtr.Zero);
+                    string targetSystemPath = Path.Combine(this.OfflineRoot, "Windows");
+                    ptr = NativeMethods.DriverStoreOpen(targetSystemPath, this.OfflineRoot, 0, IntPtr.Zero);
                     break;
 
                 default:
@@ -158,9 +162,7 @@ namespace Rapr.Utils
                         var offlinePtr = this.OpenDriverStore();
                         try
                         {
-                            string driverStoreFilename = Path.Combine(
-                                driverStoreEntry.DriverFolderLocation,
-                                driverStoreEntry.DriverInfName);
+                            string driverStoreFilename = driverStoreEntry.InfFullPath;
 
                             uint status = NativeMethods.DriverStoreDelete(
                                 offlinePtr,
@@ -210,7 +212,7 @@ namespace Rapr.Utils
                 case DriverStoreType.Offline:
                     try
                     {
-                        string targetSystemRoot = Path.Combine(this.OfflineStoreLocation, "Windows");
+                        string targetSystemRoot = Path.Combine(this.OfflineRoot, "Windows");
                         int cchDestInfPath = MAX_PATH;
                         StringBuilder destInfPath = new StringBuilder(cchDestInfPath);
 
@@ -234,7 +236,7 @@ namespace Rapr.Utils
                             destInfPath,
                             ref cchDestInfPath,
                             targetSystemRoot,
-                            this.OfflineStoreLocation);
+                            this.OfflineRoot);
 
                         if (status != 0)
                         {
@@ -262,7 +264,7 @@ namespace Rapr.Utils
         {
             try
             {
-                var devicesInfo = (List<DeviceDriverInfo>)GCHandle.FromIntPtr(lParam).Target;
+                var devicesInfo = (List<DeviceDriverInfo>)GCHandle.FromIntPtr(lParam).Target!;
 
                 devicesInfo.Add(new DeviceDriverInfo(
                     GetObjectPropertyInfo<string>(hDriverStore, ObjectName, DeviceHelper.DEVPKEY_Device_InstanceId, ObjectType),
@@ -289,10 +291,10 @@ namespace Rapr.Utils
         {
             try
             {
-                List<DriverStoreEntry> driverStoreEntries = (List<DriverStoreEntry>)GCHandle.FromIntPtr(lParam).Target;
+                List<DriverStoreEntry> driverStoreEntries = (List<DriverStoreEntry>)GCHandle.FromIntPtr(lParam).Target!;
                 var driverClassGuid = GetObjectPropertyInfo<Guid>(driverStoreHandle, driverStoreFilename, DeviceHelper.DEVPKEY_DriverPackage_ClassGuid);
 
-                string driverFolderLocation = Path.GetDirectoryName(driverStoreFilename);
+                string driverFolderLocation = Path.GetDirectoryName(driverStoreFilename) ?? string.Empty;
                 long driverSize = 0;
                 try
                 {
@@ -338,7 +340,7 @@ namespace Rapr.Utils
             return true;
         }
 
-        internal static T GetObjectPropertyInfo<T>(
+        internal static T? GetObjectPropertyInfo<T>(
             IntPtr driverStoreHandle,
             string objectName,
             DevPropKey propertyKey,
@@ -508,7 +510,7 @@ namespace Rapr.Utils
         {
             try
             {
-                List<string> binaryFiles = (List<string>)GCHandle.FromIntPtr(lParam).Target;
+                List<string> binaryFiles = (List<string>)GCHandle.FromIntPtr(lParam).Target!;
 
                 DriverFile driverFile = Marshal.PtrToStructure<DriverFile>(pDriverFile);
 
@@ -556,7 +558,7 @@ namespace Rapr.Utils
 
                         uint status = NativeMethods.DriverStoreCopy(
                             ptr,
-                            Path.Combine(driverStoreEntry.DriverFolderLocation, driverStoreEntry.DriverInfName),
+                            driverStoreEntry.InfFullPath,
                             processorArchitecture,
                             IntPtr.Zero,
                             DriverStoreCopyFlags.None,
@@ -959,8 +961,8 @@ namespace Rapr.Utils
             /// <returns>Handle to the driver store on success. IntPtr.Zero on failure.</returns>
             [DllImport("drvstore.dll", EntryPoint = "DriverStoreOpenW", SetLastError = true, CharSet = CharSet.Unicode)]
             internal static extern IntPtr DriverStoreOpen(
-                string targetSystemPath,
-                string targetBootDrive,
+                string? targetSystemPath,
+                string? targetBootDrive,
                 DriverStoreOpenFlags flags,
                 IntPtr transactionHandle);
 
@@ -1018,7 +1020,7 @@ namespace Rapr.Utils
                 IntPtr driverStoreHandle,
                 string driverPackageFileName,
                 ProcessorArchitecture processorArchitecture,
-                string localeName,
+                string? localeName,
                 DriverStoreImportFlags flags,
                 StringBuilder driverStoreFileName,
                 int driverStoreFileNameSize);
@@ -1029,7 +1031,7 @@ namespace Rapr.Utils
                 DriverStoreOfflineAddDriverPackageFlags Flags,
                 IntPtr Reserved,
                 ushort ProcessorArchitecture,
-                string LocaleName,
+                string? LocaleName,
                 StringBuilder DestInfPath,
                 ref int cchDestInfPath,
                 string TargetSystemRoot,
@@ -1145,7 +1147,7 @@ namespace Rapr.Utils
             internal static extern IntPtr DriverPackageOpen(
                 string driverPackageFilename,
                 ProcessorArchitecture processorArchitecture,
-                string localeName,
+                string? localeName,
                 DriverPackageOpenFlags flags,
                 IntPtr resolveContext);
 

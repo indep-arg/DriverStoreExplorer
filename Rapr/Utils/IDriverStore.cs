@@ -6,7 +6,7 @@ namespace Rapr.Utils
     {
         DriverStoreType Type { get; }
 
-        string OfflineStoreLocation { get; }
+        string? OfflineStoreLocation { get; }
 
         bool SupportAddInstall { get; }
 

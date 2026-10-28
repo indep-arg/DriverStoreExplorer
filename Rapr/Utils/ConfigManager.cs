@@ -126,7 +126,7 @@ namespace Rapr.Utils
             }
         }
 
-        internal static T GetDevNodeProperty<T>(uint devInst, DevPropKey propertyKey)
+        internal static T? GetDevNodeProperty<T>(uint devInst, DevPropKey propertyKey)
         {
             return ReadDevNodeProperty<T>((buffer, size) =>
             {
@@ -137,7 +137,7 @@ namespace Rapr.Utils
             });
         }
 
-        private static T ReadDevNodeProperty<T>(Func<IntPtr, uint, (ConfigManagerResult Result, uint Type, uint Size)> read)
+        private static T? ReadDevNodeProperty<T>(Func<IntPtr, uint, (ConfigManagerResult Result, uint Type, uint Size)> read)
         {
             uint size = 2048;
             for (int attempt = 0; attempt < 3; attempt++)
@@ -177,7 +177,7 @@ namespace Rapr.Utils
             return new Win32Exception((int)NativeMethods.CM_MapCrToWin32Err(result, 31));
         }
 
-        internal static T GetClassProperty<T>(Guid classGuid, DevPropKey propertyKey)
+        internal static T? GetClassProperty<T>(Guid classGuid, DevPropKey propertyKey)
         {
             const int bufferSize = 2048;
             IntPtr propertyBufferPtr = Marshal.AllocHGlobal(bufferSize);
@@ -325,10 +325,10 @@ namespace Rapr.Utils
                 uint flags);
 
             [DllImport("CfgMgr32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-            internal static extern ConfigManagerResult CM_Get_Device_ID_List_Size(ref int length, string filter, CM_GETIDLIST_FILTER flags);
+            internal static extern ConfigManagerResult CM_Get_Device_ID_List_Size(ref int length, string? filter, CM_GETIDLIST_FILTER flags);
 
             [DllImport("CfgMgr32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-            internal static extern ConfigManagerResult CM_Get_Device_ID_List(string filter, byte[] buffer, int bufferLength, CM_GETIDLIST_FILTER flags);
+            internal static extern ConfigManagerResult CM_Get_Device_ID_List(string? filter, byte[] buffer, int bufferLength, CM_GETIDLIST_FILTER flags);
 
             [DllImport("CfgMgr32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
             internal static extern ConfigManagerResult CM_Locate_DevNode(ref uint devInst, string deviceID, CM_LOCATE_DEVNODE_FLAG flags);

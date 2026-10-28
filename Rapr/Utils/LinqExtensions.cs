@@ -10,9 +10,9 @@ namespace Rapr.Utils
     public static class LinqExtensions
     {
         private static readonly MethodInfo ToSortableStringMethod =
-            typeof(LinqExtensions).GetMethod(nameof(ToSortableString), BindingFlags.NonPublic | BindingFlags.Static);
+            typeof(LinqExtensions).GetMethod(nameof(ToSortableString), BindingFlags.NonPublic | BindingFlags.Static)!;
 
-        public static IOrderedEnumerable<T> OrderByColumnName<T>(this IEnumerable<T> source, string columnName, bool ascending = true)
+        public static IOrderedEnumerable<T> OrderByColumnName<T>(this IEnumerable<T> source, string? columnName, bool ascending = true)
         {
             if (string.IsNullOrEmpty(columnName))
             {
@@ -27,10 +27,10 @@ namespace Rapr.Utils
                 .First(m => m.Name == (ascending ? "OrderBy" : "OrderByDescending") && m.GetParameters().Length == 2)
                 .MakeGenericMethod(typeof(T), lambda.ReturnType);
 
-            return (IOrderedEnumerable<T>)orderByMethod.Invoke(null, new object[] { source, compiledLambda });
+            return (IOrderedEnumerable<T>)orderByMethod.Invoke(null, new object[] { source, compiledLambda })!;
         }
 
-        public static IOrderedEnumerable<T> ThenByColumnName<T>(this IOrderedEnumerable<T> source, string columnName, bool ascending = true)
+        public static IOrderedEnumerable<T> ThenByColumnName<T>(this IOrderedEnumerable<T> source, string? columnName, bool ascending = true)
         {
             if (string.IsNullOrEmpty(columnName))
             {
@@ -45,7 +45,7 @@ namespace Rapr.Utils
                 .First(m => m.Name == (ascending ? "ThenBy" : "ThenByDescending") && m.GetParameters().Length == 2)
                 .MakeGenericMethod(typeof(T), lambda.ReturnType);
 
-            return (IOrderedEnumerable<T>)thenByMethod.Invoke(null, new object[] { source, compiledLambda });
+            return (IOrderedEnumerable<T>)thenByMethod.Invoke(null, new object[] { source, compiledLambda })!;
         }
 
         private static LambdaExpression CreateKeySelector<T>(string columnName)
@@ -68,7 +68,7 @@ namespace Rapr.Utils
             return typeof(IComparable).IsAssignableFrom(Nullable.GetUnderlyingType(type) ?? type);
         }
 
-        private static string ToSortableString(object value)
+        private static string? ToSortableString(object? value)
         {
             if (value is string || !(value is IEnumerable items))
             {

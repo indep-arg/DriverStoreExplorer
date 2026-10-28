@@ -135,7 +135,7 @@ namespace Rapr.Utils
                 && MethodExists("newdev.dll", "DiUninstallDriverW")
                 && !NativeMethods.DiUninstallDriver(
                         IntPtr.Zero,
-                        Path.Combine(driverStoreEntry.DriverFolderLocation, driverStoreEntry.DriverInfName),
+                        driverStoreEntry.InfFullPath,
                         DIURFLAG.NO_REMOVE_INF,
                         out _))
             {
@@ -143,7 +143,7 @@ namespace Rapr.Utils
             }
 
             if (!NativeMethods.SetupUninstallOEMInf(
-                driverStoreEntry.DriverPublishedName,
+                driverStoreEntry.RequirePublishedName(),
                 forceDelete ? SetupUOInfFlags.SUOI_FORCEDELETE : SetupUOInfFlags.NONE,
                 IntPtr.Zero))
             {
@@ -164,7 +164,7 @@ namespace Rapr.Utils
             return false;
         }
 
-        private static string GetDriverInf(IntPtr deviceInfoSet, SP_DEVINFO_DATA deviceInfo)
+        private static string? GetDriverInf(IntPtr deviceInfoSet, SP_DEVINFO_DATA deviceInfo)
         {
             // Get Currently Installed Driver.
             SP_DEVINSTALL_PARAMS deviceInstallParams = new SP_DEVINSTALL_PARAMS
@@ -260,7 +260,7 @@ namespace Rapr.Utils
             return null;
         }
 
-        private static string TryGetDeviceRegistryProperty(IntPtr deviceInfoSet, SP_DEVINFO_DATA deviceInfo, DeviceRegistryProperty property)
+        private static string? TryGetDeviceRegistryProperty(IntPtr deviceInfoSet, SP_DEVINFO_DATA deviceInfo, DeviceRegistryProperty property)
         {
             try
             {
@@ -273,7 +273,7 @@ namespace Rapr.Utils
             return null;
         }
 
-        private static string GetDeviceRegistryProperty(IntPtr deviceInfoSet, SP_DEVINFO_DATA deviceInfo, DeviceRegistryProperty property)
+        private static string? GetDeviceRegistryProperty(IntPtr deviceInfoSet, SP_DEVINFO_DATA deviceInfo, DeviceRegistryProperty property)
         {
             const int BufferSize = 2048;
             IntPtr propertyBufferPtr = Marshal.AllocHGlobal(BufferSize);
@@ -307,7 +307,7 @@ namespace Rapr.Utils
             return null;
         }
 
-        private static T TryGetDevicePropertyInfo<T>(IntPtr deviceInfoSet, SP_DEVINFO_DATA deviceInfo, DevPropKey propertyKey)
+        private static T? TryGetDevicePropertyInfo<T>(IntPtr deviceInfoSet, SP_DEVINFO_DATA deviceInfo, DevPropKey propertyKey)
         {
             try
             {
@@ -320,7 +320,7 @@ namespace Rapr.Utils
             return default(T);
         }
 
-        private static T GetDevicePropertyInfo<T>(
+        private static T? GetDevicePropertyInfo<T>(
             IntPtr deviceInfoSet,
             SP_DEVINFO_DATA deviceInfo,
             DevPropKey propertyKey)
@@ -617,7 +617,7 @@ namespace Rapr.Utils
             [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
             internal static extern IntPtr SetupDiGetClassDevs(
                IntPtr classGuid,
-               string enumerator,
+               string? enumerator,
                IntPtr hwndParent,
                DIGCF flags);
 
@@ -715,7 +715,7 @@ namespace Rapr.Utils
             [return: MarshalAs(UnmanagedType.Bool)]
             internal static extern bool SetupCopyOEMInf(
                 [MarshalAs(UnmanagedType.LPWStr)] string infName,
-                [MarshalAs(UnmanagedType.LPWStr)] string sourceMediaLocation,
+                [MarshalAs(UnmanagedType.LPWStr)] string? sourceMediaLocation,
                 OemSourceMediaType sourceMediaType,
                 OemCopyStyle copyStyle,
                 [In, Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder destInfFullPath,

@@ -26,7 +26,7 @@ namespace Rapr
         public static string GetApplicationFolder()
         {
             // Assembly.Location is empty in a single-file app; the exe path is what we need anyway.
-            string assemblyLocation = Environment.ProcessPath;
+            string? assemblyLocation = Environment.ProcessPath;
 
             if (!string.IsNullOrEmpty(assemblyLocation))
             {
@@ -38,7 +38,7 @@ namespace Rapr
                     // Resolve the real path
                     assemblyLocation = GetFinalPathName(assemblyLocation);
                 }
-                return Path.GetDirectoryName(assemblyLocation);
+                return Path.GetDirectoryName(assemblyLocation) ?? AppContext.BaseDirectory;
             }
             else
             {
@@ -110,10 +110,6 @@ namespace Rapr
             }
         }
 
-        public static bool IsOSSupported =>
-            Environment.OSVersion.Platform == PlatformID.Win32NT
-            && (Environment.OSVersion.Version.Major >= 6);
-
         public static bool IsWin8OrNewer =>
             Environment.OSVersion.Platform == PlatformID.Win32NT
             && Environment.OSVersion.Version >= Win8Version;
@@ -178,7 +174,7 @@ namespace Rapr
         /// <param name="filePath">The path to the file that contains an image.</param>
         /// <returns>The System.Drawing.Icon representation of the image contained in the specified file.</returns>
         /// <exception cref="System.ArgumentException">filePath does not indicate a valid file.</exception>
-        public static Icon ExtractAssociatedIcon(string filePath)
+        public static Icon? ExtractAssociatedIcon(string filePath)
         {
             int index = 0;
 

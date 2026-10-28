@@ -25,7 +25,7 @@ namespace Rapr
         internal static extern bool DestroyIcon(IntPtr hIcon);
 
         [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
-        internal static extern int SetWindowTheme(IntPtr hWnd, string pszSubAppName, string pszSubIdList);
+        internal static extern int SetWindowTheme(IntPtr hWnd, string? pszSubAppName, string? pszSubIdList);
 
         [DllImport("user32.dll")]
         internal static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);

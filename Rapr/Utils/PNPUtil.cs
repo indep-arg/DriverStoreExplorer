@@ -21,7 +21,7 @@ namespace Rapr.Utils
         public DriverStoreType Type => DriverStoreType.Online;
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1065:Do not raise exceptions in unexpected locations", Justification = "False positive.")]
-        public string OfflineStoreLocation => throw new NotSupportedException();
+        public string? OfflineStoreLocation => throw new NotSupportedException();
 
         public bool SupportAddInstall => true;
 
@@ -58,7 +58,7 @@ namespace Rapr.Utils
             List<DriverStoreEntry> driverStoreEntries = new List<DriverStoreEntry>();
             string output = "";
 
-            if (PnpUtilHelper(PnpUtilOption.Enumerate, null, ref output))
+            if (PnpUtilHelper(PnpUtilOption.Enumerate, string.Empty, ref output))
             {
                 // Parse the output
                 driverStoreEntries = ParsePnpUtilEnumerateResult(output);
@@ -96,7 +96,7 @@ namespace Rapr.Utils
             using (StringReader sr = new StringReader(pnpUtilOutput))
             {
                 DriverStoreEntry driverStoreEntry = new DriverStoreEntry();
-                string currentLine;
+                string? currentLine;
                 bool sawKey = false;
                 ParsingState state = ParsingState.Header;
 
@@ -129,7 +129,7 @@ namespace Rapr.Utils
                     else
                     {
                         bool finishProcessCurrentLine = false;
-                        string value = null;
+                        string? value = null;
                         bool hasKeyValueDelimiter = currentLine.IndexOf(':') != -1;
 
                         if (hasKeyValueDelimiter)
@@ -207,9 +207,9 @@ namespace Rapr.Utils
             return driverStoreEntries;
         }
 
-        private static string GetDriverPropAndUpdateParsingState(string value, bool hasKeyValueDelimiter, ParsingState nextState, out bool finishProcessCurrentLine, ref bool sawKey, ref ParsingState state)
+        private static string? GetDriverPropAndUpdateParsingState(string? value, bool hasKeyValueDelimiter, ParsingState nextState, out bool finishProcessCurrentLine, ref bool sawKey, ref ParsingState state)
         {
-            string entryValue = null;
+            string? entryValue = null;
             finishProcessCurrentLine = true;
 
             if (!sawKey)
@@ -267,7 +267,7 @@ namespace Rapr.Utils
             string dummy = "";
             return PnpUtilHelper(
                 forceDelete ? PnpUtilOption.ForceDelete : PnpUtilOption.Delete,
-                driverStoreEntry.DriverPublishedName,
+                driverStoreEntry.RequirePublishedName(),
                 ref dummy);
         }
 
@@ -339,7 +339,7 @@ namespace Rapr.Utils
             //
             try
             {
-                using (Process process = Process.Start(start))
+                using (Process? process = Process.Start(start))
                 {
                     if (process == null)
                     {

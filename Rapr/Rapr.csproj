@@ -10,7 +10,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>Rapr.snk</AssemblyOriginatorKeyFile>
-    <Nullable>disable</Nullable>
+    <Nullable>enable</Nullable>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationVisualStyles>true</ApplicationVisualStyles>
     <ApplicationUseCompatibleTextRendering>false</ApplicationUseCompatibleTextRendering>

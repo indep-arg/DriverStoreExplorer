@@ -63,7 +63,7 @@ namespace Rapr
             var size = new Size(width, this.RowHeight == -1 ? width : this.RowHeight);
             int imageCount = this.TriStateCheckBoxes ? 3 : 2;
 
-            ImageList current = this.StateImageList;
+            ImageList? current = this.StateImageList;
             if (current != null && current.ImageSize == size && current.Images.Count == imageCount)
             {
                 return;
@@ -278,7 +278,7 @@ namespace Rapr
         /// </summary>
         public override bool RestoreState(byte[] state)
         {
-            ViewState viewState;
+            ViewState? viewState;
             try
             {
                 viewState = JsonSerializer.Deserialize<ViewState>(state);
@@ -344,7 +344,7 @@ namespace Rapr
             }
         }
 
-        private OLVColumn GetColumnOrNull(int index) =>
+        private OLVColumn? GetColumnOrNull(int index) =>
             index >= 0 && index < this.AllColumns.Count ? this.AllColumns[index] : null;
 
         private sealed class ViewState

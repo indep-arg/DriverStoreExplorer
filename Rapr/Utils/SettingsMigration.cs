@@ -14,9 +14,9 @@ namespace Rapr.Utils
         internal static bool UsePortableSettings(ApplicationSettingsBase settings, string directory, string fileName, Action<bool> migrate)
         {
             string path = Path.Combine(directory, fileName);
-            byte[] originalFile = File.Exists(path) ? File.ReadAllBytes(path) : null;
+            byte[]? originalFile = File.Exists(path) ? File.ReadAllBytes(path) : null;
             bool hasPortableSettings = originalFile?.Length > 0;
-            XmlDocument document = hasPortableSettings ? LoadSettingsFile(path) : null;
+            XmlDocument? document = hasPortableSettings ? LoadSettingsFile(path) : null;
 
             using (var probe = new FileStream(path, originalFile == null ? FileMode.CreateNew : FileMode.Open,
                 FileAccess.ReadWrite, FileShare.None, 4096, originalFile == null ? FileOptions.DeleteOnClose : FileOptions.None))
@@ -39,13 +39,13 @@ namespace Rapr.Utils
                 }
 
                 bool hasDriverStoreOption;
-                if (hasPortableSettings)
+                if (document != null)
                 {
                     var property = settings.Properties["DriverStoreOption"];
                     bool roaming = PortableSettingsProvider.AllRoaming
                         || property.Attributes.Contains(typeof(SettingsManageabilityAttribute));
                     string scope = roaming ? "Roaming" : "PC_" + Environment.MachineName;
-                    string group = XmlConvert.EncodeLocalName((string)settings.Context["GroupName"]);
+                    string group = XmlConvert.EncodeLocalName((string?)settings.Context["GroupName"]) ?? string.Empty;
                     hasDriverStoreOption = document.SelectSingleNode($"configuration/userSettings/{scope}/{group}/DriverStoreOption") != null;
                 }
                 else
@@ -61,7 +61,7 @@ namespace Rapr.Utils
                 {
                     rollbackValues = CaptureValues(settings);
                 }
-                else
+                else if (rollbackValues != null)
                 {
                     RestoreValues(settings, rollbackValues);
                 }
@@ -125,7 +125,7 @@ namespace Rapr.Utils
             }
         }
 
-        internal static void SaveAndVerify(ApplicationSettingsBase settings, string path = null)
+        internal static void SaveAndVerify(ApplicationSettingsBase settings, string? path = null)
         {
             var expected = CaptureValues(settings);
             settings.Save();
@@ -161,8 +161,8 @@ namespace Rapr.Utils
 
         private static bool HasStoredUserSettingInFiles(SettingsContext context, string name, string[] paths)
         {
-            string group = (string)context["GroupName"];
-            string key = (string)context["SettingsKey"];
+            string group = (string?)context["GroupName"] ?? string.Empty;
+            string? key = (string?)context["SettingsKey"];
             if (!string.IsNullOrEmpty(key))
             {
                 group += "." + key;

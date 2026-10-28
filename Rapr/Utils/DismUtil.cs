@@ -14,7 +14,11 @@ namespace Rapr.Utils
     {
         public DriverStoreType Type { get; }
 
-        public string OfflineStoreLocation { get; }
+        public string? OfflineStoreLocation { get; }
+
+        // Only offline stores have a location; the online code paths never read it.
+        private string OfflineRoot => this.OfflineStoreLocation
+            ?? throw new InvalidOperationException("This driver store is not an offline image.");
 
         public DismUtil()
         {
@@ -107,7 +111,7 @@ namespace Rapr.Utils
                             DriverDate = driverPackage.Date,
                             DriverVersion = driverPackage.Version,
                             DriverFolderLocation = Path.GetDirectoryName(driverPackage.OriginalFileName),
-                            DriverSize = GetDriverFolderSize(Path.GetDirectoryName(driverPackage.OriginalFileName)),
+                            DriverSize = GetDriverFolderSize(Path.GetDirectoryName(driverPackage.OriginalFileName) ?? string.Empty),
                             BootCritical = driverPackage.BootCritical,
                         };
 
@@ -147,7 +151,7 @@ namespace Rapr.Utils
                     return DismApi.OpenOnlineSession();
 
                 case DriverStoreType.Offline:
-                    return DismApi.OpenOfflineSession(this.OfflineStoreLocation);
+                    return DismApi.OpenOfflineSession(this.OfflineRoot);
 
                 default:
                     throw new NotSupportedException();
@@ -185,7 +189,7 @@ namespace Rapr.Utils
                         {
                             using (DismSession session = this.GetSession())
                             {
-                                DismApi.RemoveDriver(session, driverStoreEntry.DriverPublishedName);
+                                DismApi.RemoveDriver(session, driverStoreEntry.RequirePublishedName());
                             }
                         }
                         finally
@@ -283,7 +287,7 @@ namespace Rapr.Utils
 
                         if (hresult != 0 && hresult != 1)
                         {
-                            string lastErrorMessage = DismApi.GetLastErrorMessage();
+                            string? lastErrorMessage = DismApi.GetLastErrorMessage();
                             if (!string.IsNullOrEmpty(lastErrorMessage))
                             {
                                 throw new DismException(lastErrorMessage.Trim());
@@ -333,7 +337,7 @@ namespace Rapr.Utils
                 DismSession Session,
                 [MarshalAs(UnmanagedType.LPWStr)] string Destination,
                 SafeWaitHandle CancelHandle,
-                ProgressCallback Progress,
+                ProgressCallback? Progress,
                 IntPtr UserData);
         }
     }

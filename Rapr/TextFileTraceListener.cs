@@ -12,7 +12,7 @@ namespace Rapr
     {
         private const string DefaultLogFile = "Rapr.log";
 
-        public static string LastTraceFile { get; private set; }
+        public static string LastTraceFile { get; private set; } = string.Empty;
 
         public TextFileTraceListener()
             : base(CreateLogStreamWithCleanup())
@@ -31,7 +31,8 @@ namespace Rapr
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                string fallbackLogDirectory = Path.GetDirectoryName(ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.PerUserRoamingAndLocal).FilePath);
+                string fallbackLogDirectory = Path.GetDirectoryName(ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.PerUserRoamingAndLocal).FilePath)
+                    ?? throw new IOException("The settings folder is unknown.", ex);
                 Directory.CreateDirectory(fallbackLogDirectory);
 
                 LastTraceFile = Path.Combine(fallbackLogDirectory, DefaultLogFile);
@@ -44,7 +45,7 @@ namespace Rapr
 
         private static FileStream CreateLogFileStream() => File.Open(LastTraceFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
 
-        public override void TraceEvent(TraceEventCache eventCache, string source, TraceEventType eventType, int id, string format, params object[] args)
+        public override void TraceEvent(TraceEventCache? eventCache, string source, TraceEventType eventType, int id, string? format, params object?[]? args)
         {
             if (this.Filter?.ShouldTrace(eventCache, source, eventType, id, format, args, null, null) == false)
             {
@@ -55,7 +56,7 @@ namespace Rapr
 
             if (args?.Length > 0)
             {
-                base.WriteLine(string.Format(format, args));
+                base.WriteLine(string.Format(format ?? string.Empty, args));
             }
             else
             {
@@ -63,12 +64,12 @@ namespace Rapr
             }
         }
 
-        public override void TraceEvent(TraceEventCache eventCache, string source, TraceEventType eventType, int id, string message)
+        public override void TraceEvent(TraceEventCache? eventCache, string source, TraceEventType eventType, int id, string? message)
         {
             this.TraceEvent(eventCache, source, eventType, id, message, null);
         }
 
-        public override void WriteLine(string message)
+        public override void WriteLine(string? message)
         {
             base.WriteLine($"{DateTime.UtcNow:u}: {message}");
         }

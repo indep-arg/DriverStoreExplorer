@@ -23,10 +23,10 @@ namespace Rapr
         private const char IconSave = '';
         private const char IconDownload = '';
 
-        private static readonly string IconFontName = FindIconFont();
+        private static readonly string? IconFontName = FindIconFont();
 
         private readonly Dictionary<ToolStripItem, char> toolbarIcons = new Dictionary<ToolStripItem, char>();
-        private ToolStrip operationsToolStrip;
+        private ToolStrip? operationsToolStrip;
 
         private void SetupToolbar()
         {
@@ -121,7 +121,7 @@ namespace Rapr
 
         private void RefreshToolbarIcons()
         {
-            if (IconFontName == null)
+            if (IconFontName == null || this.operationsToolStrip == null)
             {
                 return;
             }
@@ -131,17 +131,17 @@ namespace Rapr
 
             foreach (KeyValuePair<ToolStripItem, char> pair in this.toolbarIcons)
             {
-                Image old = pair.Key.Image;
-                pair.Key.Image = CreateIcon(pair.Value, size, color);
+                Image? old = pair.Key.Image;
+                pair.Key.Image = CreateIcon(pair.Value, size, color, IconFontName);
                 old?.Dispose();
             }
         }
 
-        private static Bitmap CreateIcon(char glyph, int size, Color color)
+        private static Bitmap CreateIcon(char glyph, int size, Color color, string fontName)
         {
             var bitmap = new Bitmap(size, size);
             using (Graphics graphics = Graphics.FromImage(bitmap))
-            using (var font = new Font(IconFontName, size * 0.8f, GraphicsUnit.Pixel))
+            using (var font = new Font(fontName, size * 0.8f, GraphicsUnit.Pixel))
             using (var brush = new SolidBrush(color))
             using (var format = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
             {
@@ -152,7 +152,7 @@ namespace Rapr
             return bitmap;
         }
 
-        private static string FindIconFont()
+        private static string? FindIconFont()
         {
             using (var fonts = new InstalledFontCollection())
             {

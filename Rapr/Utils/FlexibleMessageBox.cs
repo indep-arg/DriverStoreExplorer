@@ -1,3 +1,6 @@
+// Third-party code kept as it was written; it predates nullable annotations.
+#nullable disable
+
 using System;
 using System.Diagnostics;
 using System.Drawing;

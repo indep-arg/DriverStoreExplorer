@@ -281,15 +281,15 @@ namespace Rapr.Utils
         internal static readonly DevPropKey DEVPKEY_DriverPackage_Primitive =               new DevPropKey(0x8163eb01, 0x142c, 0x4f7a, 0x94, 0xe1, 0xa2, 0x74, 0xcc, 0x47, 0xdb, 0xba, 40);   // DEVPROP_TYPE_BOOLEAN
         internal static readonly DevPropKey DEVPKEY_DriverPackage_Invalidated =             new DevPropKey(0x8163eb01, 0x142c, 0x4f7a, 0x94, 0xe1, 0xa2, 0x74, 0xcc, 0x47, 0xdb, 0xba, 41);   // DEVPROP_TYPE_BOOLEAN
 
-        internal static T ConvertPropToType<T>(IntPtr propertyBufferPtr, DevPropType propertyType)
+        internal static T? ConvertPropToType<T>(IntPtr propertyBufferPtr, DevPropType propertyType)
         {
             if ((propertyType == DevPropType.String || propertyType == DevPropType.StringIndirect) && typeof(T) == typeof(string))
             {
-                return (T)(object)Marshal.PtrToStringUni(propertyBufferPtr);
+                return (T?)(object?)Marshal.PtrToStringUni(propertyBufferPtr);
             }
             else if (propertyType == DevPropType.FileTime && (typeof(T) == typeof(DateTime) || typeof(T) == typeof(DateTime?)))
             {
-                var time = (System.Runtime.InteropServices.ComTypes.FILETIME)Marshal.PtrToStructure(propertyBufferPtr, typeof(System.Runtime.InteropServices.ComTypes.FILETIME));
+                var time = Marshal.PtrToStructure<System.Runtime.InteropServices.ComTypes.FILETIME>(propertyBufferPtr);
                 ulong high = (ulong)time.dwHighDateTime;
                 uint low = (uint)time.dwLowDateTime;
                 long fileTime = (long)((high << 32) + low);
@@ -310,7 +310,7 @@ namespace Rapr.Utils
             }
             else if (propertyType == DevPropType.String && typeof(T) == typeof(Version))
             {
-                return Version.TryParse(Marshal.PtrToStringUni(propertyBufferPtr), out Version version)
+                return Version.TryParse(Marshal.PtrToStringUni(propertyBufferPtr), out Version? version)
                     ? (T)(object)version
                     : (T)(object)(new Version());
             }
@@ -320,7 +320,7 @@ namespace Rapr.Utils
             }
             else if (propertyType == DevPropType.Guid && typeof(T) == typeof(Guid))
             {
-                return (T)Marshal.PtrToStructure(propertyBufferPtr, typeof(Guid));
+                return (T)(object)Marshal.PtrToStructure<Guid>(propertyBufferPtr);
             }
             else if (propertyType == DevPropType.Boolean && (typeof(T) == typeof(bool) || typeof(T) == typeof(bool?)))
             {
@@ -333,7 +333,7 @@ namespace Rapr.Utils
 
                 while (true)
                 {
-                    string curStr = Marshal.PtrToStringUni(curStringPos);
+                    string? curStr = Marshal.PtrToStringUni(curStringPos);
                     if (string.IsNullOrEmpty(curStr))
                     {
                         break;

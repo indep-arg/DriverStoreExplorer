@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -34,7 +35,7 @@ namespace Rapr
             return client;
         }
 
-        public async Task<VersionInfo> GetLatestVersionInfo()
+        public async Task<VersionInfo?> GetLatestVersionInfo()
         {
             using (var response = await this.httpClient.GetAsync(new Uri(versionInfoUrl)).ConfigureAwait(false))
             {
@@ -48,12 +49,12 @@ namespace Rapr
             }
         }
 
-        internal static VersionInfo ParseLatestRelease(string json)
+        internal static VersionInfo? ParseLatestRelease(string json)
         {
-            GitHubRelease release;
+            GitHubRelease? release;
             using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json)))
             {
-                release = (GitHubRelease)new DataContractJsonSerializer(typeof(GitHubRelease)).ReadObject(stream);
+                release = (GitHubRelease?)new DataContractJsonSerializer(typeof(GitHubRelease)).ReadObject(stream);
             }
 
             // Pick the zip release.yml uploads rather than whichever asset happens to be first.
@@ -62,13 +63,15 @@ namespace Rapr
                 && a.Name.StartsWith("DriverStoreExplorer-", StringComparison.OrdinalIgnoreCase)
                 && a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
 
-            if (release?.TagName == null || release.HtmlUrl == null || asset?.BrowserDownloadUrl == null)
+            // A tag that isn't a plain version (a pre-release, say) is not an update.
+            if (release?.TagName == null || release.HtmlUrl == null || asset?.BrowserDownloadUrl == null
+                || !Version.TryParse(release.TagName.TrimStart('v', 'V'), out Version? version))
             {
                 return null;
             }
 
             // Parse "sha256:<hex>" format
-            string sha256 = null;
+            string? sha256 = null;
             if (asset.Digest != null && asset.Digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
             {
                 sha256 = asset.Digest.Substring("sha256:".Length);
@@ -76,7 +79,7 @@ namespace Rapr
 
             return new VersionInfo
             {
-                Version = Version.Parse(release.TagName.TrimStart('v', 'V')),
+                Version = version,
                 PageUrl = new Uri(release.HtmlUrl),
                 DownloadUrl = new Uri(asset.BrowserDownloadUrl),
                 Sha256 = sha256
@@ -153,7 +156,8 @@ namespace Rapr
                 sourceDir = subDirs[0];
             }
 
-            InstallUpdate(sourceDir, Environment.ProcessPath);
+            InstallUpdate(sourceDir, Environment.ProcessPath
+                ?? throw new InvalidOperationException("The path of the running executable is unknown."));
 
             // Clean up temp folder
             try { Directory.Delete(tempBaseDir, true); } catch { }
@@ -163,7 +167,8 @@ namespace Rapr
         {
             sourceDir = Path.GetFullPath(sourceDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             currentExePath = Path.GetFullPath(currentExePath);
-            string appDir = Path.GetDirectoryName(currentExePath);
+            string appDir = Path.GetDirectoryName(currentExePath)
+                ?? throw new InvalidOperationException($"{currentExePath} has no parent folder.");
             string appDirPrefix = appDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
             string sourceExePath = Path.Combine(sourceDir, typeof(UpdateManager).Assembly.GetName().Name + ".exe");
             string oldExePath = currentExePath + ".old";
@@ -242,10 +247,10 @@ namespace Rapr
                 foreach (var file in filesToCopy)
                 {
                     string destPath = GetDestinationPath(file);
-                    string destDir = Path.GetDirectoryName(destPath);
+                    string? destDir = Path.GetDirectoryName(destPath);
 
                     var missingDirectories = new Stack<string>();
-                    for (string directory = destDir; !Directory.Exists(directory); directory = Path.GetDirectoryName(directory))
+                    for (string? directory = destDir; directory != null && !Directory.Exists(directory); directory = Path.GetDirectoryName(directory))
                     {
                         missingDirectories.Push(directory);
                     }
@@ -274,7 +279,7 @@ namespace Rapr
 
                     try
                     {
-                        if (backups.TryGetValue(destination, out string backup))
+                        if (backups.TryGetValue(destination, out string? backup))
                         {
                             File.Copy(backup, destination, overwrite: true);
                         }
@@ -365,9 +370,10 @@ namespace Rapr
             }
         }
 
-        private static bool IsGitHubUrl(Uri url)
+        private static bool IsGitHubUrl([NotNullWhen(true)] Uri? url)
         {
-            return url.Scheme == Uri.UriSchemeHttps
+            return url != null
+                && url.Scheme == Uri.UriSchemeHttps
                 && (url.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase)
                     || url.Host.EndsWith(".github.com", StringComparison.OrdinalIgnoreCase)
                     || url.Host.EndsWith(".githubusercontent.com", StringComparison.OrdinalIgnoreCase));
@@ -426,26 +432,26 @@ namespace Rapr
         private sealed class GitHubRelease
         {
             [DataMember(Name = "tag_name")]
-            public string TagName { get; set; }
+            public string? TagName { get; set; }
 
             [DataMember(Name = "html_url")]
-            public string HtmlUrl { get; set; }
+            public string? HtmlUrl { get; set; }
 
             [DataMember(Name = "assets")]
-            public List<GitHubAsset> Assets { get; set; }
+            public List<GitHubAsset>? Assets { get; set; }
         }
 
         [DataContract]
         private sealed class GitHubAsset
         {
             [DataMember(Name = "name")]
-            public string Name { get; set; }
+            public string? Name { get; set; }
 
             [DataMember(Name = "browser_download_url")]
-            public string BrowserDownloadUrl { get; set; }
+            public string? BrowserDownloadUrl { get; set; }
 
             [DataMember(Name = "digest")]
-            public string Digest { get; set; }
+            public string? Digest { get; set; }
         }
     }
 }

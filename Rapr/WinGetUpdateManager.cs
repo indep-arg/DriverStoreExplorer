@@ -13,11 +13,11 @@ namespace Rapr
 
         public bool HandlesRestart => true;
 
-        public async Task<VersionInfo> GetLatestVersionInfo()
+        public async Task<VersionInfo?> GetLatestVersionInfo()
         {
             // Use winget search to get the latest available version — version numbers
             // in the output are always locale-independent (digits and dots).
-            string output = await RunCommandAsync(
+            string? output = await RunCommandAsync(
                 "winget",
                 $"search --id {WinGetPackageId} --exact --source winget --disable-interactivity --accept-source-agreements")
                 .ConfigureAwait(false);
@@ -60,7 +60,8 @@ namespace Rapr
         public Task ApplyUpdateAsync(VersionInfo versionInfo, IProgress<float> progress)
         {
             int pid = Process.GetCurrentProcess().Id;
-            string exePath = Environment.ProcessPath;
+            string exePath = Environment.ProcessPath
+                ?? throw new InvalidOperationException("The path of the running executable is unknown.");
 
             string scriptDir = Path.Combine(Path.GetTempPath(), "DriverStoreExplorer");
             if (!Directory.Exists(scriptDir))
@@ -97,9 +98,9 @@ del ""%~f0""
             this.updateManager.Dispose();
         }
 
-        private static Task<string> RunCommandAsync(string fileName, string arguments)
+        private static Task<string?> RunCommandAsync(string fileName, string arguments)
         {
-            return Task.Run(() =>
+            return Task.Run<string?>(() =>
             {
                 try
                 {
@@ -114,6 +115,11 @@ del ""%~f0""
 
                     using (var process = Process.Start(psi))
                     {
+                        if (process == null)
+                        {
+                            return null;
+                        }
+
                         string output = process.StandardOutput.ReadToEnd();
                         process.WaitForExit();
                         return output;
