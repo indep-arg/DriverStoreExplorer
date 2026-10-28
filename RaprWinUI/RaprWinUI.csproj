@@ -61,6 +61,18 @@
 
 
   <!--
+    dotnet publish of an unpackaged WinUI app leaves out the compiled XAML (*.xbf) and the app's
+    resource index (DriverStoreExplorer.pri). Without them the exe dies at start with a
+    XamlParseException in InitializeComponent. Build puts them in OutDir, so add them from there.
+  -->
+  <Target Name="IncludeXamlOutputsInPublish" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <_XamlOutput Include="$(OutDir)*.xbf;$(OutDir)$(AssemblyName).pri" />
+      <ResolvedFileToPublish Include="@(_XamlOutput->'%(FullPath)')" RelativePath="%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+
+  <!--
     The linked driver store code predates nullable annotations, so with them on it raises dozens
     of warnings in files this project can't change. Turn those warnings off for the linked files
     only; this project's own code keeps the checks.
