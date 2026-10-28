@@ -361,6 +361,53 @@ namespace Rapr
             };
             this.warnBeforeSelectingUnusedDriversStripMenuItem.Click += this.WarnBeforeSelectingUnusedDriversStripMenuItem_Click;
             this.optionsStripMenuItem.DropDownItems.Add(this.warnBeforeSelectingUnusedDriversStripMenuItem);
+
+            var themeMenu = new ToolStripMenuItem(Language.ResourceManager.GetString("Menu_Options_Theme", Language.Culture));
+            foreach (var (value, textKey) in new[]
+            {
+                ("System", "Menu_Options_Theme_System"),
+                ("Light", "Menu_Options_Theme_Light"),
+                ("Dark", "Menu_Options_Theme_Dark"),
+            })
+            {
+                var item = new ToolStripMenuItem(Language.ResourceManager.GetString(textKey, Language.Culture))
+                {
+                    Tag = value,
+                    Checked = string.Equals(Settings.Default.ColorMode, value, StringComparison.OrdinalIgnoreCase),
+                };
+                item.Click += this.ThemeMenuItem_Click;
+                themeMenu.DropDownItems.Add(item);
+            }
+
+            this.optionsStripMenuItem.DropDownItems.Add(themeMenu);
+        }
+
+        private void ThemeMenuItem_Click(object sender, EventArgs e)
+        {
+            var selected = (ToolStripMenuItem)sender;
+            string colorMode = (string)selected.Tag;
+            if (string.Equals(Settings.Default.ColorMode, colorMode, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            foreach (ToolStripItem item in selected.Owner.Items)
+            {
+                if (item is ToolStripMenuItem menuItem)
+                {
+                    menuItem.Checked = menuItem == selected;
+                }
+            }
+
+            Settings.Default.ColorMode = colorMode;
+            Settings.Default.Save();
+
+            MessageBox.Show(
+                this,
+                Language.ResourceManager.GetString("Message_Theme_Restart", Language.Culture),
+                Language.Product_Name,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
         private void EnsureOnScreen()

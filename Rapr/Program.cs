@@ -14,6 +14,29 @@ namespace Rapr
 {
     public static class Program
     {
+        // WinForms dark mode is still marked experimental in .NET 10 (WFO5001). It has to be set
+        // before the first window is created, so a change from the Options menu applies on restart.
+#pragma warning disable WFO5001
+        private static void ApplyColorMode(string colorMode)
+        {
+            SystemColorMode mode;
+            switch (colorMode)
+            {
+                case "Light":
+                    mode = SystemColorMode.Classic;
+                    break;
+                case "Dark":
+                    mode = SystemColorMode.Dark;
+                    break;
+                default:
+                    mode = SystemColorMode.System;
+                    break;
+            }
+
+            Application.SetColorMode(mode);
+        }
+#pragma warning restore WFO5001
+
         private static void AddEnvironmentPaths(string path)
         {
             var paths = new[] { Environment.GetEnvironmentVariable("PATH") ?? string.Empty, path };
@@ -164,6 +187,7 @@ namespace Rapr
                 }
 
                 DriverStoreFactory.ValidateDriverStoreOption();
+                ApplyColorMode(Properties.Settings.Default.ColorMode);
 
                 using (DSEForm mainForm = new DSEForm())
                 {
