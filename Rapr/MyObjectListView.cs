@@ -96,6 +96,18 @@ namespace Rapr
             }
         }
 
+        protected override void OnVisibleChanged(EventArgs e)
+        {
+            base.OnVisibleChanged(e);
+
+            // The designer sets GridLines after the list's window may already exist, which undid
+            // the change made in OnHandleCreated; apply the dark style again once it's shown.
+            if (this.Visible && this.IsHandleCreated && IsDarkMode)
+            {
+                this.ApplyDarkStyle();
+            }
+        }
+
         /// <summary>
         /// ObjectListView draws its header and items itself, so WinForms' dark mode only reaches part
         /// of it: the header stayed white and the group titles were dark blue on black.

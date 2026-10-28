@@ -30,6 +30,13 @@ namespace Rapr
 
         private void SetupToolbar()
         {
+            // Switching the language rebuilds the form; release the previous toolbar and its icons.
+            foreach (ToolStripItem item in this.toolbarIcons.Keys)
+            {
+                item.Image?.Dispose();
+            }
+
+            this.operationsToolStrip?.Dispose();
             this.toolbarIcons.Clear();
 
             var toolbar = new ToolStrip
