@@ -420,6 +420,24 @@ namespace Rapr.Tests
         }
 
         [TestMethod]
+        public void CheckBoxesCanBeTurnedOnAfterTheListHasAWindow()
+        {
+            // Like the main form: the list's window already exists when checkboxes are turned on,
+            // and attaching the state image list makes the native list view recreate itself.
+            using (var list = new MyObjectListView { UseCompatibleStateImageBehavior = false })
+            {
+                Assert.AreNotEqual(IntPtr.Zero, list.Handle);
+
+                list.CheckBoxes = true;
+
+                Assert.AreEqual(2, list.StateImageList.Images.Count);
+                list.SetObjects(new[] { CreateDriver("first.inf", 1) });
+                list.CheckedObjects = list.Objects.Cast<DriverStoreEntry>().ToList();
+                Assert.HasCount(1, list.CheckedObjects);
+            }
+        }
+
+        [TestMethod]
         public void ViewStateRoundTripsIncludingTheSecondarySort()
         {
             using (var previous = CreateListWithColumns())

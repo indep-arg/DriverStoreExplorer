@@ -16,10 +16,12 @@ namespace Rapr
         private int layoutDpi;
 
         /// <summary>
-        /// Builds the checkbox images. ObjectListView's own version keeps a Graphics open on each
-        /// bitmap while adding it to the ImageList, which .NET 10 rejects ("cannot add the image to
-        /// the ImageList") and crashed the app at startup. It also always drew them at 16 pixels;
-        /// these are sized for the monitor's DPI.
+        /// Builds the checkbox images. ObjectListView attaches an empty ImageList to the ListView and
+        /// then adds the images to it, but with UseCompatibleStateImageBehavior off, attaching it
+        /// recreates the native list view, which destroys that image list (see the comments in
+        /// ListView.StateImageList), so on .NET 10 the adds failed with "cannot add the image to the
+        /// ImageList" and the app crashed at startup. Here the list is filled before it is attached.
+        /// The images are also sized for the monitor's DPI instead of a fixed 16 pixels.
         /// </summary>
         protected override void InitializeStateImageList()
         {
@@ -29,35 +31,29 @@ namespace Rapr
             }
 
             int width = this.LogicalToDeviceUnits(16);
-            int height = this.RowHeight == -1 ? width : this.RowHeight;
-            if (this.StateImageList == null || this.StateImageList.ImageSize != new Size(width, height))
+            var size = new Size(width, this.RowHeight == -1 ? width : this.RowHeight);
+            int imageCount = this.TriStateCheckBoxes ? 3 : 2;
+
+            ImageList current = this.StateImageList;
+            if (current != null && current.ImageSize == size && current.Images.Count == imageCount)
             {
-                this.StateImageList = new ImageList
-                {
-                    ImageSize = new Size(width, height),
-                    ColorDepth = ColorDepth.Depth32Bit,
-                };
+                return;
             }
 
-            ImageList images = this.StateImageList;
-            if (images.Images.Count == 0)
+            var images = new ImageList
             {
-                AddCheckBoxImage(images, "checkbox-unchecked", CheckBoxState.UncheckedNormal);
-            }
+                ImageSize = size,
+                ColorDepth = ColorDepth.Depth32Bit,
+            };
 
-            if (images.Images.Count <= 1)
-            {
-                AddCheckBoxImage(images, "checkbox-checked", CheckBoxState.CheckedNormal);
-            }
-
-            if (this.TriStateCheckBoxes && images.Images.Count <= 2)
+            AddCheckBoxImage(images, "checkbox-unchecked", CheckBoxState.UncheckedNormal);
+            AddCheckBoxImage(images, "checkbox-checked", CheckBoxState.CheckedNormal);
+            if (this.TriStateCheckBoxes)
             {
                 AddCheckBoxImage(images, "checkbox-indeterminate", CheckBoxState.MixedNormal);
             }
-            else if (images.Images.ContainsKey("checkbox-indeterminate"))
-            {
-                images.Images.RemoveByKey("checkbox-indeterminate");
-            }
+
+            this.StateImageList = images;
         }
 
         protected override void OnHandleCreated(EventArgs e)
@@ -89,11 +85,8 @@ namespace Rapr
                 }
             }
 
-            if (this.CheckBoxes)
-            {
-                this.StateImageList = null;
-                this.InitializeStateImageList();
-            }
+            // Builds new checkbox images if the size changed.
+            this.InitializeStateImageList();
         }
 
         private static void AddCheckBoxImage(ImageList images, string key, CheckBoxState state)
